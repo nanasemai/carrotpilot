@@ -220,38 +220,62 @@ class MyTrack:
     self.jLead_avg = FirstOrderFilter(self.jLead, 0.4, self.dt)
     self.yRel_avg = FirstOrderFilter(self.yRel, 0.02, self.dt)
     self.yvRel_avg = FirstOrderFilter(self.yvRel, 0.02, self.dt)
-        
-  def update(self, radar_point):
-    self.vLead = radar_point.vLead
-    """
-    if abs(radar_point.dRel - self.dRel) > 3.0 or abs(self.vRel - radar_point.vRel) > 20.0 * self.dt:
-      self.cnt = 0
-      self.jLead = 0.0
-      self.aLead = 0.0
-      self.vLead_avg.x = self.vLead
-      self.aLead_avg.x = self.aLead
-      self.jLead_avg.x = self.jLead
-      self.v_lead_filtered_last = self.vLead
-    """
+    self.cnt = 0
 
-    self.yRel = self.yRel_avg.update(radar_point.yRel)
-    self.yvRel = self.yvRel_avg.update(radar_point.yvRel)
-
-    v_lead_filtered = self.vLead_avg.update(self.vLead)
-    pseudo_stop = abs(v_lead_filtered) < 0.3 and abs(self.vLead - v_lead_filtered) < 0.05
-    a_raw = (v_lead_filtered - self.v_lead_filtered_last) / self.dt
-    self.v_lead_filtered_last = v_lead_filtered
-    a_lead = self.aLead_avg.update(a_raw if not pseudo_stop else 0.0)
-
-    j_lead = (a_lead - self.aLead) / self.dt
-    self.aLead = a_lead
-    self.jLead = self.jLead_avg.update(j_lead)
-
-    # Store latest values
+  def init_point(self, radar_point):
     self.dRel = radar_point.dRel
     self.vRel = radar_point.vRel
+    self.yRel = radar_point.yRel
+    self.yvRel = radar_point.yvRel
+    self.vLead = radar_point.vLead
+    self.v_lead_filtered_last = self.vLead
+    self.aLead = 0.0
+    self.jLead = 0.0
+    self.vLead_avg.x = self.vLead
+    self.aLead_avg.x = self.aLead
+    self.jLead_avg.x = self.jLead
+    self.yRel_avg.x = self.yRel
+    self.yvRel_avg.x = self.yvRel
+        
+  def update(self, radar_point):
+    if not radar_point.measured:
+      if self.cnt > 0:
+        self.init_point(radar_point)
+      self.cnt = 0
+    elif self.cnt < 1:
+      self.init_point(radar_point)
+      self.cnt += 1
+    else:      
+      self.vLead = radar_point.vLead
+      """
+      if abs(radar_point.dRel - self.dRel) > 3.0 or abs(self.vRel - radar_point.vRel) > 20.0 * self.dt:
+        self.cnt = 0
+        self.jLead = 0.0
+        self.aLead = 0.0
+        self.vLead_avg.x = self.vLead
+        self.aLead_avg.x = self.aLead
+        self.jLead_avg.x = self.jLead
+        self.v_lead_filtered_last = self.vLead
+      """
 
-    self.cnt += 1
+      self.yRel = self.yRel_avg.update(radar_point.yRel)
+      self.yvRel = self.yvRel_avg.update(radar_point.yvRel)
+
+      v_lead_filtered = self.vLead_avg.update(self.vLead)
+      pseudo_stop = abs(v_lead_filtered) < 0.3 and abs(self.vLead - v_lead_filtered) < 0.05
+      a_raw = (v_lead_filtered - self.v_lead_filtered_last) / self.dt
+      self.v_lead_filtered_last = v_lead_filtered
+      a_lead = self.aLead_avg.update(a_raw if not pseudo_stop else 0.0)
+
+      j_lead = (a_lead - self.aLead) / self.dt
+      self.aLead = a_lead
+      self.jLead = self.jLead_avg.update(j_lead if self.cnt > 2 else 0.0)
+
+      # Store latest values
+      self.dRel = radar_point.dRel
+      self.vRel = radar_point.vRel
+
+      self.cnt += 1
 
 # generic car and radar interfaces
 class RadarInterfaceBase(ABC):

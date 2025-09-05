@@ -254,6 +254,7 @@ struct CarState {
   carrotCruise @73 : Int16;
   leftLaneLine @74 : Int16; # -1: no lane, 0: dashed, 1: solid, +10: white, +20: yellow, ex) 21: solid yellow
   rightLaneLine @75 : Int16; # -1: no lane, 0: dashed, 1: solid, +10: white, +20: yellow, ex) 21: solid yellow
+  datetime @76 :UInt64; # timestamp in milliseconds since epoch
 
   struct Tpms {
     fl @0 :Float32;
@@ -455,6 +456,10 @@ struct CarControl {
     leadRightDist @19: Float32;
     leadLeftLat @20: Float32;
     leadRightLat @21: Float32;
+    leadLeftDist2 @22: Float32;
+    leadRightDist2 @23: Float32;
+    leadLeftLat2 @24: Float32;
+    leadRightLat2 @25: Float32;
 
     # not used with the dash, TODO: separate structs for dash UI and device UI
     audibleAlert @5: AudibleAlert;

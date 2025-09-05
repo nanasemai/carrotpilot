@@ -368,9 +368,9 @@ class CarrotPlanner:
     v_cruise_kph = self.cruise_eco_control(v_ego_cluster_kph, v_cruise_kph)
     v_cruise_kph, atc_active = self._update_carrot_man(sm, v_ego_kph, v_cruise_kph)
     
-    if atc_active and not self.atc_active and self.xState not in [XState.e2eStop, XState.e2eStopped, XState.lead]:
-      if self.atcType in ["turn left", "turn right", "atc left", "atc right"]:
-        self.xState = XState.e2ePrepare
+    #if atc_active and not self.atc_active and self.xState not in [XState.e2eStop, XState.e2eStopped, XState.lead]:
+    #  if self.atcType in ["turn left", "turn right", "atc left", "atc right"]:
+    #    self.xState = XState.e2ePrepare
     self.atc_active = atc_active
 
     v_cruise = v_cruise_kph * CV.KPH_TO_MS
@@ -407,7 +407,7 @@ class CarrotPlanner:
         self.events.add(EventName.trafficSignChanged)
     elif self.xState == XState.e2eStopped:
       if carstate.gasPressed:
-        self.xState = XState.e2ePrepare
+        self.xState = XState.e2eCruise #XState.e2ePrepare
       elif lead_detected and (radarstate.leadOne.dRel - stop_model_x) < 2.0:
         self.xState = XState.lead
       elif self.stopping_count == 0:

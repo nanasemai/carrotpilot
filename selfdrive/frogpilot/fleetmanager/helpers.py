@@ -266,9 +266,13 @@ def get_locations():
   return data
 
 def preload_favs():
+  raw_json = params.get("ApiCache_NavDestinations", encoding='utf8')
+  if raw_json is None:
+    return (None, None, None, None, None)
+
   try:
-    nav_destinations = json.loads(params.get("ApiCache_NavDestinations", encoding='utf8'))
-  except TypeError:
+    nav_destinations = json.loads(raw_json)
+  except (TypeError, json.JSONDecodeError):
     return (None, None, None, None, None)
 
   locations = {"home": None, "work": None, "fav1": None, "fav2": None, "fav3": None}

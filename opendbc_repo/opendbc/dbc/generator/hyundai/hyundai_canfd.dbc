@@ -235,7 +235,7 @@ BO_ 373 TCS: 24 XXX
  SG_ ACCEnable : 67|2@0+ (1,0) [0|3] "" XXX
  SG_ ACC_REQ : 68|1@0+ (1,0) [0|1] "" XXX
  SG_ NEW_SIGNAL_5 : 72|1@0+ (1,0) [0|1] "" XXX
- SG_ NEW_SIGNAL_2 : 74|1@0+ (1,0) [0|1] "" XXX
+ SG_ BrakeLight : 74|2@1+ (1,0) [0|3] "" XXX
  SG_ NEW_SIGNAL_3 : 76|1@0+ (1,0) [0|1] "" XXX
  SG_ NEW_SIGNAL_1 : 80|1@0+ (1,0) [0|1] "" XXX
  SG_ DriverBraking : 81|1@0+ (1,0) [0|1] "" XXX
@@ -337,11 +337,11 @@ BO_ 354 CCNC_0x162: 32 CCNC
  SG_ RF_DETECT_DISTANCE : 141|11@1+ (0.1,0) [0|204.7] "m" XXX
  SG_ RF_DETECT_LATERAL : 152|7@1+ (0.1,0) [0|127] "m" XXX
  SG_ LR_DETECT : 163|5@1+ (1,0) [0|31] "" XXX
- SG_ LR_DETECT_DISTANCE : 168|9@1+ (0.1,0) [0|204.7] "m" XXX
- SG_ LR_DETECT_LATERAL : 177|7@1+ (0.1,0) [0|127] "m" XXX
+ SG_ LR_DETECT_DISTANCE : 175|8@0+ (0.1,0) [0|255] "" XXX
+ SG_ LR_DETECT_LATERAL : 176|7@1+ (0.1,0) [0|127] "" XXX
  SG_ RR_DETECT : 192|5@1+ (1,0) [0|31] "" XXX
- SG_ RR_DETECT_DISTANCE : 197|9@1+ (0.1,0) [0|204.7] "m" XXX
- SG_ RR_DETECT_LATERAL : 206|7@1+ (0.1,0) [0|127] "m" XXX
+ SG_ RR_DETECT_DISTANCE : 197|8@1+ (0.1,0) [0|255] "" XXX
+ SG_ RR_DETECT_LATERAL : 205|7@1+ (0.1,0) [0|127] "" XXX
  SG_ FAULT_FSS : 213|3@1+ (1,0) [0|7] "" XXX
  SG_ FAULT_FCA : 216|3@1+ (1,0) [0|7] "" XXX
  SG_ FAULT_LSS : 219|3@1+ (1,0) [0|7] "" XXX
@@ -834,12 +834,14 @@ BO_ 1151 HVAC_TOUCH_BUTTONS: 8 XXX
  SG_ HEAT_BUTTON : 52|1@0+ (1,0) [0|1] "" XXX
 
 BO_ 1187 HDA_INFO_4A3: 8 XXX
- SG_ SIGNAL_0 : 0|4@1+ (1,0) [0|15] "" XXX
- SG_ NEW_SIGNAL_1 : 4|4@1+ (1,0) [0|15] "" XXX
+ SG_ LinkClass : 0|3@1+ (1,0) [0|7] "" XXX
+ SG_ Frwinfo : 3|3@1+ (1,0) [0|7] "" XXX
+ SG_ SpeedUnit : 6|2@1+ (1,0) [0|3] "" XXX
  SG_ SPEED_LIMIT : 15|8@0+ (1,0) [0|255] "" XXX
- SG_ NEW_SIGNAL_3 : 23|8@0+ (1,0) [0|255] "" XXX
- SG_ NEW_SIGNAL_4 : 31|8@0+ (1,0) [0|255] "" XXX
- SG_ NEW_SIGNAL_5 : 39|8@0+ (1,0) [0|255] "" XXX
+ SG_ CountryCode : 16|10@1+ (1,0) [0|1023] "" XXX
+ SG_ MapSource : 27|3@1+ (1,0) [0|7] "" XXX
+ SG_ TollExist : 30|2@1+ (1,0) [0|3] "" XXX
+ SG_ TunnelExist : 38|2@1+ (1,0) [0|3] "" XXX
  SG_ NEW_SIGNAL_6 : 47|24@0+ (1,0) [0|16777215] "" XXX
 
 BO_ 1204 NEW_MSG_4B4: 8 XXX

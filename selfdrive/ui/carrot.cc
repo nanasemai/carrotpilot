@@ -676,7 +676,7 @@ protected:
         return true;
 	};
     bool isLeadSCC() {
-        return radarTrackId < 2;
+        return radarTrackId < 1;
     }
     bool isRadarDetected() {
         return radarTrackId >= 0;
@@ -1120,8 +1120,14 @@ protected:
                 ui_draw_text(s, bx, by + 20, str, 35, COLOR_WHITE, BOLD);
                 break;
             }
-            if (xDistToTurn < 1000) sprintf(str, "%d m", xDistToTurn);
-            else  sprintf(str, "%.1f km", xDistToTurn / 1000.f);
+            if (s->scene.is_metric) {
+              if (xDistToTurn < 1000) sprintf(str, "%d m", xDistToTurn);
+              else  sprintf(str, "%.1f km", xDistToTurn / 1000.f);
+            }
+            else {
+              if (xDistToTurn < 1609) sprintf(str, "%d ft", (int)(xDistToTurn * 3.28084));
+              else sprintf(str, "%.1f mi", xDistToTurn / 1609.344f);
+            }
             ui_draw_text(s, bx, by + 120, str, 40, COLOR_WHITE, BOLD);
         }
         nvgTextAlign(s->vg, NVG_ALIGN_LEFT | NVG_ALIGN_BOTTOM);

@@ -180,7 +180,7 @@ class CarInterface(CarInterfaceBase):
 
     #ret.radarUnavailable = False  # TODO: canfd... carrot, hyundai cars have radar
 
-    ret.radarTimeStep = 0.05 if params.get_int("EnableRadarTracks") > 0 else 0.02
+    ret.radarTimeStep = 0.05 #if params.get_int("EnableRadarTracks") > 0 else 0.02
 
     ret.pcmCruise = not ret.openpilotLongitudinalControl
     ret.startingState = False # True  # carrot

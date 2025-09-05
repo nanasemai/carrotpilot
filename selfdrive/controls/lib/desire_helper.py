@@ -130,7 +130,9 @@ class DesireHelper:
 
     self.lane_available_last = False
     self.edge_available_last = False
-    self.object_detected_count = 0    
+    self.object_detected_count = 0
+    self.lane_available_trigger = False
+    self.lane_appeared = False
 
     self.laneChangeNeedTorque = 0
     self.laneChangeBsd = 0
@@ -147,6 +149,7 @@ class DesireHelper:
     self.desire_disable_count = 0
     self.blindspot_detected_counter = 0
     self.auto_lane_change_enable = False
+    self.next_lane_change = False
 
   def check_lane_state(self, modeldata):
     lane_width_left, self.distance_to_road_edge_left, self.distance_to_road_edge_left_far, lane_prob_left = calculate_lane_width(modeldata.laneLines[0], modeldata.laneLineProbs[0],
@@ -264,7 +267,7 @@ class DesireHelper:
       lane_exist_counter = self.lane_exist_left_count.counter if blinker_state == BLINKER_LEFT else self.lane_exist_right_count.counter
       lane_available = self.available_left_lane if blinker_state == BLINKER_LEFT else self.available_right_lane
       edge_available = self.available_left_edge if blinker_state == BLINKER_LEFT else self.available_right_edge
-      lane_appeared = lane_exist_counter == int(0.2 / DT_MDL)
+      self.lane_appeared = self.lane_appeared or lane_exist_counter == int(0.2 / DT_MDL)
 
       radar = radarState.leadLeft if blinker_state == BLINKER_LEFT else radarState.leadRight
       side_object_dist = radar.dRel + radar.vLead * 4.0 if radar.status else 255
@@ -275,20 +278,21 @@ class DesireHelper:
       lane_exist_counter = 0
       lane_available = True
       edge_available = True
-      lane_appeared = False
+      self.lane_appeared = False
+      self.lane_available_trigger = False
       self.object_detected_count = 0
 
     #lane_available_trigger = not self.lane_available_last and lane_available
     lane_change_available = (lane_available or edge_available) and lane_line_info < 20 # lane_line_info가 20보다 작으면 흰색라인임.
-    lane_available_trigger = False
+    self.lane_available_trigger = False
     lane_width_diff = self.lane_width_left_diff if atc_blinker_state == BLINKER_LEFT else self.lane_width_right_diff
     distance_to_road_edge = self.distance_to_road_edge_left if atc_blinker_state == BLINKER_LEFT else self.distance_to_road_edge_right
     lane_width_side = self.lane_width_left if atc_blinker_state == BLINKER_LEFT else self.lane_width_right
     if lane_width_diff > 0.8 and (lane_width_side < distance_to_road_edge):
-      lane_available_trigger = True
+      self.lane_available_trigger = True
     edge_availabled = not self.edge_available_last and edge_available
     side_object_detected = self.object_detected_count > -0.3 / DT_MDL
-    lane_appeared = lane_appeared and distance_to_road_edge < 4.0
+    self.lane_appeared = self.lane_appeared and distance_to_road_edge < 4.0
 
 
     if self.carrot_lane_change_count > 0:
@@ -297,8 +301,8 @@ class DesireHelper:
     else:
       auto_lane_change_blocked = ((atc_blinker_state == BLINKER_LEFT) and (driver_blinker_state != BLINKER_LEFT))
       #auto_lane_change_trigger = not auto_lane_change_blocked and edge_available and (lane_available_trigger or edge_availabled or lane_appeared) and not side_object_detected
-      auto_lane_change_trigger = self.auto_lane_change_enable and not auto_lane_change_blocked and edge_available and (lane_available_trigger or lane_appeared) and not side_object_detected
-      self.desireLog = f"L:{self.auto_lane_change_enable},{auto_lane_change_blocked},E:{lane_available},{edge_available},A:{lane_available_trigger},{lane_appeared},{lane_width_diff:.1f},{lane_width_side:.1f},{distance_to_road_edge:.1f}={auto_lane_change_trigger}"
+      auto_lane_change_trigger = self.auto_lane_change_enable and not auto_lane_change_blocked and edge_available and (self.lane_available_trigger or self.lane_appeared) and not side_object_detected
+      self.desireLog = f"L:{self.auto_lane_change_enable},{auto_lane_change_blocked},E:{lane_available},{edge_available},A:{self.lane_available_trigger},{self.lane_appeared},{lane_width_diff:.1f},{lane_width_side:.1f},{distance_to_road_edge:.1f}={auto_lane_change_trigger}"
 
     if not lateral_active or self.lane_change_timer > LANE_CHANGE_TIME_MAX:
       #print("Desire canceled")
@@ -328,6 +332,7 @@ class DesireHelper:
         # 맨끝차선이 아니면(측면에 차선이 있으면), ATC 자동작동 안함.
         #self.auto_lane_change_enable = False if lane_exist_counter > 0 else True
         self.auto_lane_change_enable = False if lane_exist_counter > 0 or lane_change_available else True
+        self.next_lane_change = False
          
 
       # LaneChangeState.preLaneChange
@@ -360,7 +365,7 @@ class DesireHelper:
             if self.blindspot_detected_counter > 0 and not ignore_bsd:  # BSD검출시
               if torque_applied and not block_lanechange_bsd:
                 self.lane_change_state = LaneChangeState.laneChangeStarting
-            elif self.laneChangeNeedTorque > 0: # 조향토크필요
+            elif self.laneChangeNeedTorque > 0 or self.next_lane_change: # 조향토크필요
               if torque_applied:
                 self.lane_change_state = LaneChangeState.laneChangeStarting
             elif driver_desire_enabled:
@@ -388,6 +393,7 @@ class DesireHelper:
           self.lane_change_direction = LaneChangeDirection.none
           if desire_enabled:
             self.lane_change_state = LaneChangeState.preLaneChange
+            self.next_lane_change = True
           else:
             self.lane_change_state = LaneChangeState.off
 

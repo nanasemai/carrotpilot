@@ -768,6 +768,8 @@ struct RadarState @0x9a185389d6fdd05f {
   leadsCenter @15 : List(LeadData);
   leadsLeft @16 : List(LeadData);
   leadsRight @17 : List(LeadData);
+  leadsLeft2 @19 : List(LeadData);
+  leadsRight2 @20 : List(LeadData);
 
   struct LeadData {
     dRel @0 :Float32;

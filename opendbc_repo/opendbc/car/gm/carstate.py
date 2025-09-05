@@ -214,7 +214,7 @@ class CarState(CarStateBase):
     if CP.transmissionType == TransmissionType.direct:
       pt_messages += [
         ("EBCMRegenPaddle", 50),
-        ("EVDriveMode", 0),
+        ("EVDriveMode", float('nan')),
       ]
     loopback_messages = [
       ("ASCMLKASteeringCmd", float('nan')),

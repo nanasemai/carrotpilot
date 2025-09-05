@@ -13,6 +13,9 @@ from opendbc.car.interfaces import CarStateBase
 
 from openpilot.common.params import Params
 
+from datetime import datetime
+from zoneinfo import ZoneInfo
+
 
 ButtonType = structs.CarState.ButtonEvent.Type
 
@@ -24,6 +27,20 @@ BUTTONS_DICT = {Buttons.RES_ACCEL: ButtonType.accelCruise, Buttons.SET_DECEL: Bu
                 Buttons.GAP_DIST: ButtonType.gapAdjustCruise, Buttons.CANCEL: ButtonType.cancel, Buttons.LFA_BUTTON: ButtonType.lfaButton}
 
 GearShifter = structs.CarState.GearShifter
+
+
+NUMERIC_TO_TZ = {
+    840: "America/New_York",   # 미국 (US) → 동부 시간대
+    124: "America/Toronto",    # 캐나다 (CA) → 동부 시간대
+    250: "Europe/Paris",       # 프랑스 (FR)
+    276: "Europe/Berlin",      # 독일 (DE)
+    826: "Europe/London",      # 영국 (GB)
+    392: "Asia/Tokyo",         # 일본 (JP)
+    156: "Asia/Shanghai",      # 중국 (CN)
+    410: "Asia/Seoul",         # 한국 (KR)
+     36: "Australia/Sydney",   # 호주 (AU)
+    356: "Asia/Kolkata",       # 인도 (IN)
+}
 
 class CarState(CarStateBase):
   def __init__(self, CP):
@@ -140,9 +157,11 @@ class CarState(CarStateBase):
     self.CAM_0x2a4 = True if 0x2a4 in fingerprints[alt_bus] else False
     self.STEER_TOUCH_2AF = True if 0x2af in fingerprints[pt_bus] else False
     self.TPMS = True if 0x3a0 in fingerprints[pt_bus] else False
+    self.LOCAL_TIME = True if 1264 in fingerprints[pt_bus] else False
 
     self.cp_bsm = None
-
+    self.time_zone = "UTC"
+    
     self.controls_ready_count = 0
 
   def update(self, can_parsers) -> structs.CarState:
@@ -421,7 +440,7 @@ class CarState(CarStateBase):
     ret.vEgo, ret.aEgo = self.update_speed_kf(ret.vEgoRaw)
     ret.standstill = ret.wheelSpeeds.fl <= STANDSTILL_THRESHOLD and ret.wheelSpeeds.rr <= STANDSTILL_THRESHOLD
 
-    ret.brakeLights = ret.brakePressed or (ret.aEgo < -0.5) ### TODO: �ӽ÷� brakeLight�� ������.
+    ret.brakeLights = ret.brakePressed or cp.vl["TCS"]["BrakeLight"] == 1
 
     ret.steeringRateDeg = cp.vl["STEERING_SENSORS"]["STEERING_RATE"]
     ret.steeringAngleDeg = cp.vl["STEERING_SENSORS"]["STEERING_ANGLE"] * -1
@@ -517,8 +536,12 @@ class CarState(CarStateBase):
         if not self.is_metric:
           speedLimit *= CV.MPH_TO_KPH
         ret.speedLimit = speedLimit if speedLimit < 255 else 0
-        if int(self.hda_info_4a3["NEW_SIGNAL_4"]) == 17:
+        if int(self.hda_info_4a3["MapSource"]) == 2:
           speed_limit_cam = True
+
+        if self.time_zone == "UTC":
+          country_code = int(self.hda_info_4a3["CountryCode"])
+          self.time_zone = ZoneInfo(NUMERIC_TO_TZ.get(country_code, "UTC"))
 
       self.new_msg_4b4 = cp.vl["NEW_MSG_4B4"] if self.NEW_MSG_4B4 else None
       self.tcs_info_373 = cp.vl["TCS"]
@@ -551,6 +574,16 @@ class CarState(CarStateBase):
     # TODO: find this message on ICE & HYBRID cars + cruise control signals (if exists)
     if self.CP.flags & HyundaiFlags.EV:
       ret.cruiseState.nonAdaptive = cp.vl["MANUAL_SPEED_LIMIT_ASSIST"]["MSLA_ENABLED"] == 1
+
+    if self.LOCAL_TIME and self.time_zone != "UTC":
+      lt = cp.vl["LOCAL_TIME"]
+      y, m, d, H, M, S = int(lt["YEAR"]) + 2000, int(lt["MONTH"]), int(lt["DATE"]), int(lt["HOURS"]), int(lt["MINUTES"]), int(lt["SECONDS"])
+      try:
+        dt_local = datetime(y, m, d, H, M, S, tzinfo=self.time_zone)
+        ret.datetime = int(dt_local.timestamp() * 1000)
+      except:
+        #print(f"Error parsing local time: {y}-{m}-{d} {H}:{M}:{S} in {self.time_zone}")
+        pass
 
     prev_cruise_buttons = self.cruise_buttons[-1]
     #self.cruise_buttons.extend(cp.vl_all[self.cruise_btns_msg_canfd]["CRUISE_BUTTONS"])
