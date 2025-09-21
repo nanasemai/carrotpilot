@@ -630,7 +630,13 @@ class CarrotMan:
       car_selected = car_selected.decode('utf-8')
 
     git_branch = Params().get("GitBranch").decode('utf-8')
-    directory = git_branch + " " + car_selected + " " + Params().get("DongleId").decode('utf-8')
+    try:
+      ftp.mkd(git_branch)
+    except Exception as e:
+      print(f"Directory creation failed: {e}")
+    ftp.cwd(git_branch)
+    
+    directory = car_selected + " " + Params().get("DongleId").decode('utf-8')
     current_time = datetime.now().strftime("%Y%m%d-%H%M%S")
     filename = tmux_why + "-" + current_time + "-" + git_branch + ".txt"
 
