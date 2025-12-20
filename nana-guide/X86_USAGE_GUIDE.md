@@ -321,6 +321,12 @@ export DEV=AMD
 scons -u -j$(nproc)
 ```
 
+#### 库文件依然依赖 icu66
+```bash
+wget http://archive.ubuntu.com/ubuntu/pool/main/i/icu/libicu66_66.1-2ubuntu2.1_amd64.deb
+sudo dpkg -i libicu66_66.1-2ubuntu2.1_amd64.deb
+```
+
 项目会自动检测您的架构（X86_64）并构建相应的版本。构建过程可能需要几分钟到几十分钟，具体取决于您的硬件性能。
 
 **注意：**
