@@ -20,13 +20,26 @@ if WIDE_CAM:
 
 class Camerad:
   def __init__(self):
-    self.pm = messaging.PubMaster([c.msg_name for c in CAMERAS])
+    # Filter cameras to only include those that exist
+    self.available_cameras = []
+    for c in CAMERAS:
+      cam_device = f"/dev/video{c.cam_id}"
+      if os.path.exists(cam_device):
+        self.available_cameras.append(c)
+        print(f"Camera {cam_device} found")
+      else:
+        print(f"Warning: Camera {cam_device} not found, skipping")
+
+    if not self.available_cameras:
+      raise RuntimeError("No cameras found! Please check camera connections and settings.")
+
+    self.pm = messaging.PubMaster([c.msg_name for c in self.available_cameras])
     self.vipc_server = VisionIpcServer("camerad")
 
     self.cameras = []
-    for c in CAMERAS:
+    for c in self.available_cameras:
       cam_device = f"/dev/video{c.cam_id}"
-      print(f"opening {c.msg_name} at {cam_device}")
+      print(f"Opening {c.msg_name} at {cam_device}")
       cam = Camera(c.msg_name, c.stream_type, cam_device)
       self.cameras.append(cam)
       self.vipc_server.create_buffers(c.stream_type, 20, cam.W, cam.H)

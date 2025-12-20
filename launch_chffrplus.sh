@@ -16,6 +16,9 @@ else
   export ZMQ=1         # Enable ZMQ for IPC
   export USE_WEBCAM=1  # Enable webcam support
   export ROAD_CAM=0    # Default road camera setting
+  # Disable other cameras
+  export DRIVER_CAM=""  # Disable driver camera
+  export WIDE_CAM=""    # Disable wide camera
   export PYTHONPATH="$PWD"  # Set Python path
 fi
 
@@ -129,10 +132,10 @@ function launch {
     UV_BIN="$HOME/.local/bin"
     PATH="$UV_BIN:$PATH"
   fi
-  
+
   echo "updating dependencies with uv sync..."
   uv sync --frozen --all-extras
-  
+
   # Activate virtual environment if it exists
   if [ -f ".venv/bin/activate" ]; then
     source .venv/bin/activate

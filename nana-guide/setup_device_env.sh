@@ -46,12 +46,28 @@ else
   echo "export USE_WEBCAM=1  # Enable webcam support" >> "$ROOT"/.env
 fi
 
-# Set road camera to default (0)
+# Set road camera to default (0) and disable other cameras
 echo "Setting road camera to default (0)..."
 if grep -q "export ROAD_CAM=" "$ROOT"/.env; then
   sed -i 's/.*export ROAD_CAM=.*/export ROAD_CAM=0  # Default road camera setting (dev/video0)/' "$ROOT"/.env
 else
   echo "export ROAD_CAM=0  # Default road camera setting (dev/video0)" >> "$ROOT"/.env
+fi
+
+# Disable driver camera (set to empty to prevent access to /dev/video2)
+echo "Disabling driver camera..."
+if grep -q "export DRIVER_CAM=" "$ROOT"/.env; then
+  sed -i 's/.*export DRIVER_CAM=.*/export DRIVER_CAM=""  # Disable driver camera/' "$ROOT"/.env
+else
+  echo "export DRIVER_CAM=""  # Disable driver camera" >> "$ROOT"/.env
+fi
+
+# Disable wide camera (set to empty to prevent access to wide camera device)
+echo "Disabling wide camera..."
+if grep -q "export WIDE_CAM=" "$ROOT"/.env; then
+  sed -i 's/.*export WIDE_CAM=.*/export WIDE_CAM=""  # Disable wide camera/' "$ROOT"/.env
+else
+  echo "export WIDE_CAM=""  # Disable wide camera" >> "$ROOT"/.env
 fi
 
 # Set parameter directory to project root for PC environment

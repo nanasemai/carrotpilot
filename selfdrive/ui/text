@@ -1,7 +1,25 @@
 #!/bin/sh
 
-if [ -f /TICI ] && [ ! -f _text ]; then
-  cp qt/text_larch64 _text
+# Check architecture and use appropriate text utility
+ARCH=$(uname -m)
+
+# Copy appropriate pre-built text utility if available and not already present
+if [ ! -f _text ]; then
+  if [ -f /TICI ]; then
+    cp qt/text_larch64 _text
+  elif [ "$ARCH" = "x86_64" ] && [ -f qt/text_x86_64 ]; then
+    cp qt/text_x86_64 _text
+  elif [ "$ARCH" = "aarch64" ] && [ -f qt/text_aarch64 ]; then
+    cp qt/text_aarch64 _text
+  fi
 fi
 
-exec ./_text "$1"
+# Make it executable
+if [ -f _text ]; then
+  chmod +x _text
+  exec ./_text "$1"
+else
+  # Fallback if no text utility available
+  echo "Text utility executable not found. Please build it with 'scons selfdrive/ui/_text'"
+  exit 1
+fi

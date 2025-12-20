@@ -412,7 +412,7 @@ class CarrotMan:
     carrot_speed.maybe_save()
 
 
-  
+
   def carrot_navi_route(self):
 
     if self.carrot_serv.active_carrot > 1:
@@ -707,8 +707,13 @@ class CarrotMan:
 
   def make_tmux_data(self):
     try:
-      subprocess.run("rm /data/media/tmux.log; tmux capture-pane -pq -S-1000 > /data/media/tmux.log", shell=True, capture_output=True, text=False)
-      subprocess.run("/data/openpilot/selfdrive/apilot.py", shell=True, capture_output=True, text=False)
+      # Use LOG_ROOT environment variable instead of hardcoded path
+      log_root = os.environ.get('LOG_ROOT', '/data/media/0/realdata')
+      tmux_log_path = os.path.join(log_root, 'tmux.log')
+      subprocess.run(f"rm {tmux_log_path}; tmux capture-pane -pq -S-1000 > {tmux_log_path}", shell=True, capture_output=True, text=False)
+      # Use project root directory instead of hardcoded path
+      apilot_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "selfdrive", "apilot.py")
+      subprocess.run(apilot_path, shell=True, capture_output=True, text=False)
     except Exception as e:
       print(f"TMUX creation error: {e}")
       return
@@ -745,7 +750,10 @@ class CarrotMan:
     ftp.cwd(directory)
 
     try:
-      with open("/data/media/tmux.log", "rb") as file:
+      # Use LOG_ROOT environment variable instead of hardcoded path
+      log_root = os.environ.get('LOG_ROOT', '/data/media/0/realdata')
+      tmux_log_path = os.path.join(log_root, 'tmux.log')
+      with open(tmux_log_path, "rb") as file:
         ftp.storbinary(f'STOR {filename}', file)
     except Exception as e:
       print(f"ftp sending error...: {e}")
@@ -754,7 +762,10 @@ class CarrotMan:
       self.save_toggle_values()
       try:
         #with open("/data/backup_params.json", "rb") as file:
-        with open("/data/toggle_values.json", "rb") as file:
+        params_root = os.environ.get('PARAMS_ROOT', '/data/params')
+        data_dir = os.path.dirname(params_root)
+        file_path = os.path.join(data_dir, 'toggle_values.json')
+        with open(file_path, "rb") as file:
           ftp.storbinary(f'STOR toggles-{current_time}.json', file)
       except Exception as e:
         print(f"ftp params sending error...: {e}")
@@ -767,7 +778,9 @@ class CarrotMan:
       if self.show_panda_debug:
         self.show_panda_debug = False
         try:
-          subprocess.run("/data/openpilot/selfdrive/debug/debug_console_carrot.py", shell=True)
+          # Use project root directory instead of hardcoded path
+          script_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "selfdrive", "debug", "debug_console_carrot.py")
+          subprocess.run(script_path, shell=True)
         except Exception as e:
           print(f"debug_console error: {e}")
           time.sleep(2)
@@ -779,7 +792,15 @@ class CarrotMan:
       import openpilot.selfdrive.frogpilot.fleetmanager.helpers as fleet
 
       toggle_values = fleet.get_all_toggle_values()
-      file_path = os.path.join('/data', 'toggle_values.json')
+      # Use PARAMS_ROOT environment variable, default to /data/params, then get parent directory
+      params_root = os.environ.get('PARAMS_ROOT', '/data/params')
+      data_dir = os.path.dirname(params_root)  # Get parent directory of params
+
+      # Ensure the directory exists before writing the file
+      if not os.path.exists(data_dir):
+        os.makedirs(data_dir)
+
+      file_path = os.path.join(data_dir, 'toggle_values.json')
       with open(file_path, 'w') as file:
         json.dump(toggle_values, file, indent=2)
     except Exception as e:

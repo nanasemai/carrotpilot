@@ -54,6 +54,20 @@ if ! grep -q "export ROAD_CAM=" "$ROOT"/.env; then
   echo "export ROAD_CAM=0" >> "$ROOT"/.env
 fi
 
+# Add DRIVER_CAM to disable driver camera
+if grep -q "export DRIVER_CAM=" "$ROOT"/.env; then
+  sed -i 's/.*export DRIVER_CAM=.*/export DRIVER_CAM=""  # Disable driver camera/' "$ROOT"/.env
+else
+  echo "export DRIVER_CAM=""  # Disable driver camera" >> "$ROOT"/.env
+fi
+
+# Add WIDE_CAM to disable wide camera
+if grep -q "export WIDE_CAM=" "$ROOT"/.env; then
+  sed -i 's/.*export WIDE_CAM=.*/export WIDE_CAM=""  # Disable wide camera/' "$ROOT"/.env
+else
+  echo "export WIDE_CAM=""  # Disable wide camera" >> "$ROOT"/.env
+fi
+
 # Add PARAMS_ROOT to set parameter directory to project root for PC environment
 if ! grep -q "export PARAMS_ROOT=" "$ROOT"/.env; then
   echo "# Set parameter directory to project root for PC environment" >> "$ROOT"/.env
