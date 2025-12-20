@@ -476,6 +476,66 @@ export LITE=1
 sudo pkill -f "python.*openpilot" && sudo pkill -f "modeld" && sudo pkill -f "loggerd"
 ```
 
+### 4.6 系统目录配置
+
+在PC环境下，carrotpilot的目录结构与设备环境有所不同。系统采用了灵活的目录配置机制，允许通过环境变量进行自定义。
+
+#### 4.6.1 目录配置优先级
+
+carrotpilot使用以下优先级来确定目录位置（从高到低）：
+1. **.env文件中定义的环境变量**
+2. **启动脚本中设置的默认值**
+3. **代码中定义的默认路径**
+
+#### 4.6.2 关键目录说明
+
+| 目录类型 | 环境变量 | 默认路径（PC环境） | 说明 |
+|---------|---------|------------------|------|
+| 日志和视频存储 | LOG_ROOT | `$HOME/.comma/realdata` | 存储行车日志和dashcam视频 |
+| 系统日志 | SWAGLOG_ROOT | `$HOME/.comma/log` | 存储系统运行日志 |
+| 参数目录 | PARAMS_ROOT | `$HOME/.comma/params` | 存储系统参数和配置 |
+| 持久化存储 | - | `$HOME/.comma/persist` | 存储持久化数据 |
+| 下载缓存 | COMMA_CACHE | `/tmp/comma_download_cache` | 存储下载的模型和资源 |
+
+#### 4.6.3 项目根目录下的data文件夹
+
+在PC环境下，推荐将所有数据目录放在项目根目录下的`data`文件夹中。`setup_device_env.sh`脚本会自动配置以下环境变量：
+
+```bash
+# 日志和视频存储目录
+export LOG_ROOT="${PWD}/data/realdata"
+# 系统日志目录
+export SWAGLOG_ROOT="${PWD}/data/log"
+# 参数目录
+export PARAMS_ROOT="${PWD}/data/params"
+```
+
+#### 4.6.4 手动自定义目录
+
+如果需要手动自定义目录，可以编辑项目根目录下的`.env`文件，添加或修改以下环境变量：
+
+```bash
+# 自定义日志和视频存储目录
+export LOG_ROOT="/path/to/your/logs"
+# 自定义系统日志目录
+export SWAGLOG_ROOT="/path/to/your/system/logs"
+# 自定义参数目录
+export PARAMS_ROOT="/path/to/your/params"
+# 自定义下载缓存目录
+export COMMA_CACHE="/path/to/your/cache"
+```
+
+#### 4.6.5 目录自动创建
+
+`launch_chffrplus.sh`脚本会自动创建必要的目录结构，包括：
+- 参数目录及其子目录
+- 临时工作目录
+
+```bash
+# 自动创建参数目录和子目录
+mkdir -p $PARAMS_ROOT/d /tmp/openpilot
+```
+
 ## 5. 硬件适配
 
 ### 5.1 摄像头配置

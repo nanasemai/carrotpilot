@@ -62,6 +62,20 @@ else
   echo "export PARAMS_ROOT=${PWD}/data/params  # Parameter directory for PC environment" >> "$ROOT"/.env
 fi
 
+# Set log and video storage directories to project root
+echo "Setting log and video storage directories..."
+if grep -q "export LOG_ROOT=" "$ROOT"/.env; then
+  sed -i 's|.*export LOG_ROOT=.*|export LOG_ROOT='"$PWD"'/data/realdata  # Log and video storage directory|' "$ROOT"/.env
+else
+  echo "export LOG_ROOT=${PWD}/data/realdata  # Log and video storage directory" >> "$ROOT"/.env
+fi
+
+if grep -q "export SWAGLOG_ROOT=" "$ROOT"/.env; then
+  sed -i 's|.*export SWAGLOG_ROOT=.*|export SWAGLOG_ROOT='"$PWD"'/data/log  # System log storage directory|' "$ROOT"/.env
+else
+  echo "export SWAGLOG_ROOT=${PWD}/data/log  # System log storage directory" >> "$ROOT"/.env
+fi
+
 # Add AMD-specific optimizations
 echo "Adding AMD-specific optimizations..."
 if ! grep -q "export AMD_IFACE=" "$ROOT"/.env; then

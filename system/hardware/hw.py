@@ -22,7 +22,9 @@ class Paths:
 
   @staticmethod
   def swaglog_root() -> str:
-    if PC:
+    if os.environ.get('SWAGLOG_ROOT', False):
+      return os.environ['SWAGLOG_ROOT']
+    elif PC:
       return os.path.join(Paths.comma_home(), "log")
     else:
       return "/data/log/"
