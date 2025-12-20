@@ -122,23 +122,20 @@ function launch {
   else
     echo "Tmux not available, skipping scrollback capture"
   fi
-  if python -c "import flask" > /dev/null 2>&1; then
-    echo "Flask already installed."
-  else
-    echo "Flask installing."
-    pip install flask
+  # Install/Update dependencies using uv sync
+  if ! command -v "uv" > /dev/null 2>&1; then
+    echo "installing uv..."
+    curl -LsSf https://astral.sh/uv/install.sh | sh
+    UV_BIN="$HOME/.local/bin"
+    PATH="$UV_BIN:$PATH"
   fi
-  if python -c "import shapely" > /dev/null 2>&1; then
-    echo "shapely already installed."
-  else
-    echo "shapely installing."
-    pip install shapely
-  fi
-  if python -c "import kaitaistruct" > /dev/null 2>&1; then
-    echo "kaitaistruct already installed."
-  else
-    echo "kaitaistruct installing."
-    pip install kaitaistruct
+  
+  echo "updating dependencies with uv sync..."
+  uv sync --frozen --all-extras
+  
+  # Activate virtual environment if it exists
+  if [ -f ".venv/bin/activate" ]; then
+    source .venv/bin/activate
   fi
 
   # events language init

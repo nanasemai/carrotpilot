@@ -84,11 +84,12 @@ sudo ./tools/install_ubuntu_dependencies.sh
 - **多媒体处理库**：ffmpeg及其开发库
 - **图形和视觉库**：libglfw3-dev, libgles2-mesa-dev等
 - **通信库**：libzmq3-dev（用于进程间通信）
+- **文件系统库**：libxattr1-dev（用于xattr Python模块，实现文件扩展属性功能）
 - **OpenCL相关库**：opencl-headers, ocl-icd-opencl-dev等
 
 ### 3.3 安装Python依赖
 
-项目使用uv包管理器管理Python依赖并自动创建虚拟环境：
+项目使用uv包管理器管理Python依赖并自动创建虚拟环境，所有依赖定义在`pyproject.toml`文件中：
 
 ```bash
 ./tools/install_python_dependencies.sh
@@ -97,13 +98,16 @@ sudo ./tools/install_ubuntu_dependencies.sh
 该脚本会：
 - 检查并安装uv包管理器（如果未安装）
 - 自动创建并激活`.venv`虚拟环境
-- 安装项目所需的所有Python依赖
-- 确保依赖版本与项目兼容
+- 使用`uv sync --frozen --all-extras`命令安装`pyproject.toml`中定义的所有Python依赖
+- 确保依赖版本与项目兼容，避免版本冲突
 - 智能管理`.env`文件：
   - 如果`.env`文件不存在，自动创建并设置默认环境变量
   - 如果`.env`文件已存在，仅添加缺失的环境变量（不覆盖现有配置）
   - 不再默认添加`DEV`环境变量，用户需根据自己的GPU类型手动配置
   - 默认启用ZMQ、USE_WEBCAM等必要配置
+  - 设置正确的`PYTHONPATH`确保模块能被正确导入
+
+**注意**：项目已不再使用手动的`pip install`命令安装依赖，所有依赖都应通过`pyproject.toml`和`uv sync`管理，以确保环境一致性。
 
 ### 3.4 安装OpenCL驱动
 
@@ -2001,8 +2005,10 @@ which uv
 rm -rf ~/.cache/uv
 ./tools/install_python_dependencies.sh
 
-# 如果仍然失败，尝试使用pip手动安装
-pip install -r requirements.txt
+# 如果仍然失败，尝试手动运行uv sync
+uv sync --frozen --all-extras
+
+**注意**：请不要使用`pip install`命令手动安装依赖，这可能导致依赖版本冲突。所有依赖都应通过`pyproject.toml`和`uv sync`管理。
 ```
 
 ### 9.8 性能相关问题
