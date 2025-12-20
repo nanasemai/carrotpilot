@@ -92,6 +92,14 @@ else
   echo "export SWAGLOG_ROOT=${PWD}/data/log  # System log storage directory" >> "$ROOT"/.env
 fi
 
+# Enable human-readable log format
+echo "Enabling human-readable log format..."
+if grep -q "export LOG_READABLE=" "$ROOT"/.env; then
+  sed -i 's/.*export LOG_READABLE=.*/export LOG_READABLE=1  # Enable human-readable log format/' "$ROOT"/.env
+else
+  echo "export LOG_READABLE=1  # Enable human-readable log format" >> "$ROOT"/.env
+fi
+
 # Add AMD-specific optimizations
 echo "Adding AMD-specific optimizations..."
 if ! grep -q "export AMD_IFACE=" "$ROOT"/.env; then

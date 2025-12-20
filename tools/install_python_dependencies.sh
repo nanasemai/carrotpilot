@@ -74,6 +74,12 @@ if ! grep -q "export PARAMS_ROOT=" "$ROOT"/.env; then
   echo "export PARAMS_ROOT=${PWD}/data/params" >> "$ROOT"/.env
 fi
 
+# Enable human-readable log format by default
+if ! grep -q "export LOG_READABLE=" "$ROOT"/.env; then
+  echo "# Enable human-readable log format" >> "$ROOT"/.env
+  echo "export LOG_READABLE=1" >> "$ROOT"/.env
+fi
+
 # macOS specific settings
 if [[ "$(uname)" == 'Darwin' ]]; then
   if ! grep -q "msgq doesn't work on mac" "$ROOT"/.env; then

@@ -25,6 +25,7 @@ from openpilot.selfdrive.carrot.carrot_serv import CarrotServ
 from openpilot.selfdrive.carrot.carrot_speed import CarrotSpeed
 
 from openpilot.common.gps import get_gps_location_service
+from openpilot.common.swaglog import cloudlog
 
 try:
   from shapely.geometry import LineString
@@ -33,6 +34,40 @@ except ImportError:
   SHAPELY_AVAILABLE = False
 
 NetworkType = log.DeviceState.NetworkType
+
+# 全局日志级别配置，控制控制台输出频率
+# DEBUG: 显示所有日志（调试用）
+# INFO: 只显示INFO和ERROR级别（默认生产环境）
+# ERROR: 只显示ERROR级别
+CONSOLE_LOG_LEVEL = "INFO"
+
+# 日志级别优先级
+LOG_LEVELS = {
+  "DEBUG": 0,
+  "INFO": 1,
+  "ERROR": 2
+}
+
+# 控制台日志打印函数
+def print_friendly(msg, level="INFO"):
+  """格式化日志输出函数 - 控制台和日志文件双输出
+  格式: 时间戳 | 级别 | 模块 | 消息
+  根据 CONSOLE_LOG_LEVEL 控制控制台输出频率
+  """
+  timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+  module_name = "CARROT"
+  
+  # 根据日志级别控制控制台输出
+  if LOG_LEVELS.get(level, 0) >= LOG_LEVELS.get(CONSOLE_LOG_LEVEL, 1):
+    print(f"{timestamp} | {level:<5} | {module_name:<10} | {msg}")
+
+  # 同时写入到 cloudlog（所有级别都写入）
+  if level == "DEBUG":
+    cloudlog.debug(f"{module_name}: {msg}")
+  elif level == "INFO":
+    cloudlog.info(f"{module_name}: {msg}")
+  elif level == "ERROR":
+    cloudlog.error(f"{module_name}: {msg}")
 
 ################ CarrotNavi
 ## 국가법령정보센터: 도로설계기준
@@ -185,7 +220,7 @@ def calculate_curvature(p1, p2, p3):
 
 class CarrotMan:
   def __init__(self):
-    print("************************************************CarrotMan init************************************************")
+    print_friendly("CarrotMan initialization started")
     self.params = Params()
     self.params_memory = Params("/dev/shm/params")
     self.gps_location_service = get_gps_location_service(self.params)
@@ -232,20 +267,54 @@ class CarrotMan:
     self.is_metric = self.params.get_bool("IsMetric")
 
   def get_broadcast_address(self):
-    if PC:
-      iface = b'br0'
-    else:
-      iface = b'wlan0'
+    # 在Ubuntu PC环境中，尝试自动检测可用的网络接口
+    interfaces_to_try = [b'wlan0', b'eth0', b'enp0s3', b'enp0s25']  # 常见的Ubuntu网络接口
+    if not PC:  # 如果不是PC设备，只使用wlan0
+      interfaces_to_try = [b'wlan0']
+
+    for iface in interfaces_to_try:
+      try:
+        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
+          # 获取IP地址
+          ip = fcntl.ioctl(
+            s.fileno(),
+            0x8919,  # SIOCGIFADDR
+            struct.pack('256s', iface)
+          )[20:24]
+          local_ip = socket.inet_ntoa(ip)
+
+          # 获取子网掩码
+          netmask = fcntl.ioctl(
+            s.fileno(),
+            0x891b,  # SIOCGIFNETMASK
+            struct.pack('256s', iface)
+          )[20:24]
+          netmask = socket.inet_ntoa(netmask)
+
+          # 计算广播地址
+          ip_bytes = socket.inet_aton(local_ip)
+          netmask_bytes = socket.inet_aton(netmask)
+          broadcast_bytes = bytes([a | ~b & 0xFF for a, b in zip(ip_bytes, netmask_bytes)])
+          broadcast_ip = socket.inet_ntoa(broadcast_bytes)
+
+          return broadcast_ip
+      except (OSError, Exception):
+        continue
+
+    # 如果所有接口都失败，尝试使用get_local_ip方法并计算广播地址
     try:
-      with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
-        ip = fcntl.ioctl(
-          s.fileno(),
-          0x8919,
-          struct.pack('256s', iface)
-        )[20:24]
-        return socket.inet_ntoa(ip)
-    except (OSError, Exception):
-      return None
+      local_ip = self.get_local_ip()
+      if not local_ip.startswith("Error:"):
+        # 简单的广播地址计算：将最后一个字节改为255
+        # 这适用于常见的子网掩码（如255.255.255.0）
+        ip_parts = local_ip.split('.')
+        if len(ip_parts) == 4:
+          ip_parts[-1] = '255'
+          return '.'.join(ip_parts)
+    except Exception:
+      pass
+
+    return None
 
   def get_local_ip(self):
       try:
@@ -304,10 +373,9 @@ class CarrotMan:
         if frame % 20 == 0 or remote_addr is not None:
           try:
             self.broadcast_ip = self.get_broadcast_address() if remote_addr is None else remote_addr[0]
-            if not PC:
-              ip_address = socket.gethostbyname(socket.gethostname())
-            else:
-              ip_address = self.get_local_ip()
+            # 在Ubuntu环境中，统一使用get_local_ip方法获取IP地址
+            # 这个方法更可靠，因为它通过连接到外部服务器来确定正确的接口IP
+            ip_address = self.get_local_ip()
             if ip_address != self.ip_address:
               self.ip_address = ip_address
               self.remote_addr = None
@@ -324,7 +392,7 @@ class CarrotMan:
             #  sock.sendto(dat, address)
 
             if remote_addr is None:
-              print(f"Broadcasting: {self.broadcast_ip}:{msg}")
+              print_friendly(f"Broadcasting: {self.broadcast_ip}:{msg}", level="DEBUG")
               if not self.navd_active:
                 #print("clear path_points: navd_active: ", self.navd_active)
                 self.navi_points = []
@@ -334,19 +402,22 @@ class CarrotMan:
             if self.connection:
               self.connection.close()
             self.connection = None
-            print(f"##### broadcast_error...: {e}")
+            print_friendly(f"Broadcast error: {e}", level="ERROR")
             traceback.print_exc()
 
         rk.keep_time()
         frame += 1
       except Exception as e:
-        print(f"broadcast_version_info error...: {e}")
+        print_friendly(f"Broadcast version info error: {e}", level="ERROR")
         traceback.print_exc()
         time.sleep(1)
 
   def carrot_speed_serv(self, carrot_speed, frame):
     v_ego = a_ego = 0.0
     gas_pressed = False
+    v_ego_kph = 0
+    v_cruise_apply = 20  # 默认值
+
     if self.sm.alive['carState'] and self.sm.alive['carControl']:
       CS = self.sm['carState']
       CC = self.sm['carControl']
@@ -354,6 +425,7 @@ class CarrotMan:
       a_ego = CS.aEgo
       gas_pressed = CS.gasPressed
       v_ego_kph = v_ego * 3.6
+
       if gas_pressed:
         self.gas_pressed_count = 200
         self.v_cruise_change = 0
@@ -375,11 +447,14 @@ class CarrotMan:
           self.gas_pressed_count = 0
       else:
         self.v_cruise_change = 0
+
       self.long_active = CC.longActive
       self.v_cruise_last = CS.vCruise
+
+      # 只有在CS和v_ego_kph有效的情况下才计算v_cruise_apply
+      v_cruise_apply = max(min(CS.vCruise, v_ego_kph), 20)
     else:
       self.v_cruise_change = 0
-    v_cruise_apply = max(min(CS.vCruise, v_ego_kph), 20)
 
     now = time.monotonic()
     heading = self.carrot_serv.bearing #nPosAnglePhone
@@ -422,7 +497,7 @@ class CarrotMan:
     if not self.navi_points_active or not SHAPELY_AVAILABLE or (self.carrot_serv.active_carrot <= 1 and not self.navd_active):
       #print(f"navi_points_active: {self.navi_points_active}, active_carrot: {self.carrot_serv.active_carrot}")
       if self.navi_points_active:
-        print("navi_points_active: ", self.navi_points_active, "active_carrot: ", self.carrot_serv.active_carrot, "navd_active: ", self.navd_active)
+        print_friendly(f"navi_points_active: {self.navi_points_active}, active_carrot: {self.carrot_serv.active_carrot}, navd_active: {self.navd_active}", level="DEBUG")
         #haversine_cache.clear()
         #curvature_cache.clear()
         self.navi_points = []
@@ -579,7 +654,7 @@ class CarrotMan:
         with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
           sock.settimeout(10)  # 소켓 타임아웃 설정 (10초)
           sock.bind(('0.0.0.0', self.carrot_man_port))  # UDP 포트 바인딩
-          print("#########carrot_man_thread: UDP thread started...")
+          print_friendly("UDP thread started...")
 
           while True:
             try:
@@ -593,14 +668,14 @@ class CarrotMan:
                   raise ConnectionError("No data received")
 
                 if self.remote_addr is None:
-                  print("Connected to: ", remote_addr)
+                  print_friendly(f"Connected to: {remote_addr}")
                 self.remote_addr = remote_addr
                 try:
                   json_obj = json.loads(data.decode())
                   self.carrot_serv.update(json_obj)
                 except Exception as e:
-                  print(f"carrot_man_thread: json error...: {e}")
-                  print(data)
+                  print_friendly(f"json error...: {e}", level="ERROR")
+                  print_friendly(f"Data: {data}", level="DEBUG")
 
                 # 응답 메시지 생성 및 송신 (UDP는 sendto 사용)
                 #try:
@@ -610,24 +685,24 @@ class CarrotMan:
                 #  print(f"carrot_man_thread: send error...: {e}")
 
               except TimeoutError:
-                print("Waiting for data (timeout)...")
+                print_friendly("Waiting for data (timeout)...", level="DEBUG")
                 self.remote_addr = None
                 time.sleep(1)
 
               except Exception as e:
-                print(f"carrot_man_thread: error...: {e}")
+                print_friendly(f"error...: {e}", level="ERROR")
                 self.remote_addr = None
                 break
 
             except Exception as e:
-              print(f"carrot_man_thread: recv error...: {e}")
+              print_friendly(f"recv error...: {e}", level="ERROR")
               self.remote_addr = None
               break
 
           time.sleep(1)
       except Exception as e:
         self.remote_addr = None
-        print(f"Network error, retrying...: {e}")
+        print_friendly(f"Network error, retrying...: {e}", level="ERROR")
         time.sleep(2)
 
 
@@ -637,7 +712,7 @@ class CarrotMan:
     try:
       decoded = data.decode('utf-8')
     except UnicodeDecodeError:
-      print("Decoding error:", data)
+      print_friendly(f"Decoding error: {data}", level="ERROR")
       return result
 
     parts = decoded.split('/')
@@ -657,7 +732,7 @@ class CarrotMan:
           sock.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
           sock.settimeout(10)  # 소켓 타임아웃 설정 (10초)
           sock.bind(('', 12345))  # UDP 포트 바인딩
-          print("#########kisa_app_thread: UDP thread started...")
+          print_friendly("KISA UDP thread started...")
 
           while True:
             try:
@@ -674,35 +749,35 @@ class CarrotMan:
                 #  print("Connected to: ", remote_addr)
                 #self.remote_addr = remote_addr
                 try:
-                  print(data)
+                  print_friendly(f"Data: {data}", level="DEBUG")
                   kisa_data = self.parse_kisa_data(data)
                   self.carrot_serv.update_kisa(kisa_data)
                   #json_obj = json.loads(data.decode())
-                  #print(json_obj)
+                  #print_friendly(f"JSON obj: {json_obj}", level="DEBUG")
                 except Exception as e:
                   traceback.print_exc()
-                  print(f"kisa_app_thread: json error...: {e}")
-                  print(data)
+                  print_friendly(f"json error...: {e}", level="ERROR")
+                  print_friendly(f"Data: {data}", level="DEBUG")
 
               except TimeoutError:
-                print("Waiting for data (timeout)...")
+                print_friendly("Waiting for data (timeout)...", level="DEBUG")
                 #self.remote_addr = None
                 time.sleep(1)
 
               except Exception as e:
-                print(f"kisa_app_thread: error...: {e}")
+                print_friendly(f"error...: {e}", level="ERROR")
                 #self.remote_addr = None
                 break
 
             except Exception as e:
-              print(f"kisa_app_thread: recv error...: {e}")
+              print_friendly(f"recv error...: {e}", level="ERROR")
               #self.remote_addr = None
               break
 
           time.sleep(1)
       except Exception as e:
         #self.remote_addr = None
-        print(f"Network error, retrying...: {e}")
+        print_friendly(f"Network error, retrying...: {e}", level="ERROR")
         time.sleep(2)
 
   def make_tmux_data(self):
@@ -715,12 +790,12 @@ class CarrotMan:
       apilot_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "selfdrive", "apilot.py")
       subprocess.run(apilot_path, shell=True, capture_output=True, text=False)
     except Exception as e:
-      print(f"TMUX creation error: {e}")
+      print_friendly(f"TMUX creation error: {e}", level="ERROR")
       return
 
   def send_tmux(self, ftp_password, tmux_why, send_settings=False):
     # FTP上传功能已禁用
-    print("FTP upload disabled: send_tmux method has been disabled")
+    print_friendly("FTP upload disabled: send_tmux method has been disabled")
     # 保留save_toggle_values调用（如果需要）
     if send_settings:
       self.save_toggle_values()
@@ -735,7 +810,7 @@ class CarrotMan:
           script_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "selfdrive", "debug", "debug_console_carrot.py")
           subprocess.run(script_path, shell=True)
         except Exception as e:
-          print(f"debug_console error: {e}")
+          print_friendly(f"debug_console error: {e}", level="ERROR")
           time.sleep(2)
       else:
         time.sleep(1)
@@ -757,7 +832,7 @@ class CarrotMan:
       with open(file_path, 'w') as file:
         json.dump(toggle_values, file, indent=2)
     except Exception as e:
-      print(f"save_toggle_values error: {e}")
+      print_friendly(f"save_toggle_values error: {e}", level="ERROR")
 
   def carrot_cmd_zmq(self):
 
@@ -773,14 +848,14 @@ class CarrotMan:
     isOnroadCount = 0
     is_tmux_sent = False
 
-    print("#########carrot_cmd_zmq: thread started...")
+    print_friendly("ZMQ command thread started...")
     while True:
       try:
         socks = dict(poller.poll(100))
 
         if socket in socks and socks[socket] == zmq.POLLIN:
           message = socket.recv(zmq.NOBLOCK)
-          print(f"Received:7710 request: {message}")
+          print_friendly(f"Received:7710 request: {message}", level="DEBUG")
           json_obj = json.loads(message.decode())
         else:
           json_obj = None
@@ -826,7 +901,7 @@ class CarrotMan:
           echo = json.dumps({"tmux_send": json_obj['tmux_send'], "result": "success"})
           socket.send(echo.encode())
       except Exception as e:
-        print(f"carrot_cmd_zmq error: {e}")
+        print_friendly(f"error: {e}", level="ERROR")
         socket.close()
         time.sleep(1)
         socket, poller = setup_socket()
@@ -856,7 +931,7 @@ class CarrotMan:
         self.navi_points = [(c.longitude, c.latitude) for c in coords]
         self.navi_points_start_index = 0
         self.navi_points_active = True
-        print("Received points from navd:", len(self.navi_points))
+        print_friendly(f"Received points from navd: {len(self.navi_points)}")
         self.navd_active = True
 
         # 경로수신 -> carrotman active되고 약간의 시간지연이 발생함..
@@ -868,7 +943,7 @@ class CarrotMan:
         coords = [{"latitude": c.latitude, "longitude": c.longitude} for c in coords]
         #print("navdNaviPoints=", self.navi_points)
       else:
-        print("Received points from navd: 0")
+        print_friendly("Received points from navd: 0")
         self.navd_active = False
 
     msg = messaging.new_message('navRoute', valid=True)
@@ -885,23 +960,23 @@ class CarrotMan:
         s.listen()
 
         while True:
-          print("################# waiting connection from CarrotMan route #####################")
+          print_friendly("waiting connection from CarrotMan route")
           conn, addr = s.accept()
           with conn:
-            print(f"Connected by {addr}")
+            print_friendly(f"Connected by {addr}")
             #self.clear_route()
 
             # 전체 데이터 크기 수신
             total_size_bytes = self.recvall(conn, 4)
             if not total_size_bytes:
-              print("Connection closed or error occurred")
+              print_friendly("Connection closed or error occurred", level="DEBUG")
               continue
             try:
               total_size = struct.unpack('!I', total_size_bytes)[0]
               # 전체 데이터를 한 번에 수신
               all_data = self.recvall(conn, total_size)
               if all_data is None:
-                  print("Connection closed or incomplete data received")
+                  print_friendly("Connection closed or incomplete data received", level="DEBUG")
                   continue
 
               self.navi_points = []
@@ -914,7 +989,7 @@ class CarrotMan:
               coords = [c.as_dict() for c in points]
               self.navi_points_start_index = 0
               self.navi_points_active = True
-              print("Received points:", len(self.navi_points))
+              print_friendly(f"Received points: {len(self.navi_points)}")
               #print("Received points:", self.navi_points)
 
               self.send_routes(coords)
@@ -928,7 +1003,7 @@ class CarrotMan:
 
                 route_engine_instance.send_route_coords(coords, True)
               except Exception as e:
-                print(f"route_engine error: {e}")
+                print_friendly(f"route_engine error: {e}", level="ERROR")
 
               #msg = messaging.new_message('navRoute', valid=True)
               #msg.navRoute.coordinates = coords
@@ -941,10 +1016,10 @@ class CarrotMan:
                 self.params.put("NavDestination", json.dumps(dest))
 
             except Exception as e:
-              print(e)
+              print_friendly(f"{e}", level="ERROR")
     except Exception as e:
-      print("################# CarrotMan route server error #####################")
-      print(e)
+      print_friendly("CarrotMan route server error", level="ERROR")
+      print_friendly(f"{e}", level="ERROR")
 
   def carrot_curve_speed_params(self):
     self.autoCurveSpeedFactor = self.params.get_int("AutoCurveSpeedFactor")*0.01
@@ -991,17 +1066,17 @@ class CarrotMan:
 import traceback
 
 def main():
-  print("CarrotManager Started")
+  print_friendly("CarrotManager Started")
   #print("Carrot GitBranch = {}, {}".format(Params().get("GitBranch"), Params().get("GitCommitDate")))
   carrot_man = CarrotMan()
 
-  print(f"CarrotMan {carrot_man}")
+  print_friendly(f"CarrotMan instance created: {carrot_man}")
   threading.Thread(target=carrot_man.kisa_app_thread).start()
   while True:
     try:
       carrot_man.carrot_man_thread()
     except Exception as e:
-      print(f"carrot_man error...: {e}")
+      print_friendly(f"CarrotMan error: {e}", level="ERROR")
       traceback.print_exc()
       time.sleep(10)
 

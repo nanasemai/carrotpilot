@@ -10,6 +10,39 @@ import time
 import numpy as np
 from datetime import datetime
 
+# 全局日志级别配置，控制控制台输出频率
+# DEBUG: 显示所有日志（调试用）
+# INFO: 只显示INFO和ERROR级别（默认生产环境）
+# ERROR: 只显示ERROR级别
+CONSOLE_LOG_LEVEL = "INFO"
+
+# 日志级别优先级
+LOG_LEVELS = {
+  "DEBUG": 0,
+  "INFO": 1,
+  "ERROR": 2
+}
+
+def print_friendly(msg, level="INFO"):
+  """格式化日志输出函数 - 控制台和日志文件双输出
+  格式: 时间戳 | 级别 | 模块 | 消息
+  根据 CONSOLE_LOG_LEVEL 控制控制台输出频率
+  """
+  timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+  module_name = "CARROT"
+
+  # 根据日志级别控制控制台输出
+  if LOG_LEVELS.get(level, 0) >= LOG_LEVELS.get(CONSOLE_LOG_LEVEL, 1):
+    print(f"{timestamp} | {level:<5} | {module_name:<10} | {msg}")
+
+  # 同时写入到 cloudlog（所有级别都写入）
+  if level == "DEBUG":
+    cloudlog.debug(f"{module_name}: {msg}")
+  elif level == "INFO":
+    cloudlog.info(f"{module_name}: {msg}")
+  elif level == "ERROR":
+    cloudlog.error(f"{module_name}: {msg}")
+
 # from ftplib import FTP  # FTP导入已注释，因为FTP上传功能已禁用
 from cereal import log
 import cereal.messaging as messaging
@@ -20,6 +53,7 @@ from openpilot.system.hardware import PC, TICI
 from openpilot.selfdrive.navd.helpers import Coordinate
 from opendbc.car.common.conversions import Conversions as CV
 from openpilot.common.gps import get_gps_location_service
+from openpilot.common.swaglog import cloudlog
 
 nav_type_mapping = {
   12: ("turn", "left", 1),
@@ -823,7 +857,7 @@ class CarrotServ:
     if "kisawazeroadspdlimit" in data:
       road_limit_speed = data["kisawazeroadspdlimit"]
       if road_limit_speed > 0:
-        print(f"kisawazeroadspdlimit: {road_limit_speed} km/h")
+        print_friendly(f"kisawazeroadspdlimit: {road_limit_speed} km/h", level="INFO")
         if not self.is_metric:
           road_limit_speed *= CV.MPH_TO_KPH
         self.nRoadLimitSpeed = road_limit_speed
@@ -832,7 +866,7 @@ class CarrotServ:
     if "kisawazeendalert" in data:
       pass
     if "kisawazeroadname" in data:
-      print(f"kisawazeroadname: {data['kisawazeroadname']}")
+      print_friendly(f"kisawazeroadname: {data['kisawazeroadname']}", level="INFO")
       self.szPosRoadName = data["kisawazeroadname"]
     if "kisawazereportid" in data and "kisawazealertdist" in data:
       id_str = data["kisawazereportid"]
@@ -842,7 +876,7 @@ class CarrotServ:
       distance = int(match.group(1)) if match else 0
       if not self.is_metric:
         distance = int(distance * 0.3048)
-      print(f"{id_str}: {distance} m")
+      print_friendly(f"{id_str}: {distance} m", level="INFO")
       xSpdType = -1
       if 'camera' in id_str:
         xSpdType = 101    # 101: waze speed cam, 100: police
@@ -1134,11 +1168,11 @@ class CarrotServ:
     epoch_time = int(time.time())
     if epoch_time_remote > 0:
       epoch_time_offset = epoch_time_remote - epoch_time
-      print(f"epoch_time_offset = {epoch_time_offset}")
+      print_friendly(f"epoch_time_offset = {epoch_time_offset}", level="DEBUG")
       if abs(epoch_time_offset) > 60:
         os.system(f"sudo timedatectl set-timezone {timezone_remote}")
         formatted_time = time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(epoch_time_remote))
-        print(f"Setting system time to: {formatted_time}")
+        print_friendly(f"Setting system time to: {formatted_time}", level="INFO")
         os.system(f'sudo date -s "{formatted_time}"')
 
   def set_time(self, epoch_time, timezone):
@@ -1158,27 +1192,27 @@ class CarrotServ:
       #print(f"Time diff too small: {diff}")
       return
 
-    print(f"Setting time to {new_time}, diff={diff}")
+    print_friendly(f"Setting time to {new_time}, diff={diff}", level="INFO")
     zoneinfo_path = f"/usr/share/zoneinfo/{timezone}"
     if os.path.exists(localtime_path) or os.path.islink(localtime_path):
         try:
             subprocess.run(["sudo", "rm", "-f", localtime_path], check=True)
-            print(f"Removed existing file or link: {localtime_path}")
+            print_friendly(f"Removed existing file or link: {localtime_path}", level="DEBUG")
         except subprocess.CalledProcessError as e:
-            print(f"Error removing {localtime_path}: {e}")
+            print_friendly(f"Error removing {localtime_path}: {e}", level="ERROR")
             return
     try:
         subprocess.run(["sudo", "ln", "-s", zoneinfo_path, localtime_path], check=True)
-        print(f"Timezone successfully set to: {timezone}")
+        print_friendly(f"Timezone successfully set to: {timezone}", level="INFO")
     except subprocess.CalledProcessError as e:
-        print(f"Failed to set timezone to {timezone}: {e}")
+        print_friendly(f"Failed to set timezone to {timezone}: {e}", level="ERROR")
 
 
     try:
       subprocess.run(f"TZ=UTC date -s '{new_time}'", shell=True, check=True)
       #subprocess.run()
     except subprocess.CalledProcessError:
-      print("timed.failed_setting_time")
+      print_friendly("timed.failed_setting_time", level="ERROR")
 
   def update(self, json):
     if json is None:
@@ -1201,7 +1235,7 @@ class CarrotServ:
       self.carrotCmdIndex = self.carrotIndex
       self.carrotCmd = json.get("carrotCmd")
       self.carrotArg = json.get("carrotArg")
-      print(f"carrotCmd = {self.carrotCmd}, {self.carrotArg}")
+      print_friendly(f"carrotCmd = {self.carrotCmd}, {self.carrotArg}", level="DEBUG")
 
     self.active_count = 80
     now = time.monotonic()
@@ -1275,10 +1309,11 @@ class CarrotServ:
       self.nPosSpeed = float(json.get("nPosSpeed", self.nPosSpeed))
       self._update_tbt()
       self._update_sdi()
-      print(
+      print_friendly(
         f"sdi = {self.nSdiType}, {self.nSdiSpeedLimit}, {self.nSdiPlusType}, " +
         f"tbt = {self.nTBTTurnType}, {self.nTBTDist}, " +
-        f"next = {self.nTBTTurnTypeNext}, {self.nTBTDistNext}"
+        f"next = {self.nTBTTurnTypeNext}, {self.nTBTDistNext}",
+        level="DEBUG"
       )
       #print(json)
     else:
@@ -1299,27 +1334,27 @@ class CarrotServ:
 
         self.nPosAngle = self.nPosAnglePhone
         # self.nPosSpeed = self.ve # TODO speed from v_ego
-        self.last_update_gps_time_phone = self.last_calculate_gps_time = now        
+        self.last_update_gps_time_phone = self.last_calculate_gps_time = now
         self.nPosSpeed = float(json.get("gps_speed", 0))
-        print(f"phone gps: {self.vpPosPointLatNavi}, {self.vpPosPointLonNavi}, {self.phone_gps_accuracy}, {self.nPosSpeed}")
+        print_friendly(f"phone gps: {self.vpPosPointLatNavi}, {self.vpPosPointLonNavi}, {self.phone_gps_accuracy}, {self.nPosSpeed}", level="DEBUG")
 
 
 import traceback
 
 def main():
-  print("CarrotManager Started")
+  print_friendly("CarrotManager Started", level="INFO")
   #print("Carrot GitBranch = {}, {}".format(Params().get("GitBranch"), Params().get("GitCommitDate")))
   # 延迟导入，避免与 carrot_man 中导入 CarrotServ 的循环依赖
   from openpilot.selfdrive.carrot.carrot_man import CarrotMan
   carrot_man = CarrotMan()
 
-  print(f"CarrotMan {carrot_man}")
+  print_friendly(f"CarrotMan {carrot_man}", level="INFO")
   threading.Thread(target=carrot_man.kisa_app_thread).start()
   while True:
     try:
       carrot_man.carrot_man_thread()
     except Exception as e:
-      print(f"carrot_man error...: {e}")
+      print_friendly(f"carrot_man error...: {e}", level="ERROR")
       traceback.print_exc()
       time.sleep(10)
 

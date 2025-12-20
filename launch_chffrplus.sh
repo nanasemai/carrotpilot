@@ -20,6 +20,7 @@ else
   export DRIVER_CAM=""  # Disable driver camera
   export WIDE_CAM=""    # Disable wide camera
   export PYTHONPATH="$PWD"  # Set Python path
+  export LOG_READABLE="1"   # Enable human-readable log format
 fi
 
 # PC environment detection and configuration
@@ -42,6 +43,12 @@ if [ ! -f /TICI ]; then
   if [ ! -f $PARAMS_ROOT/d/HardwareC3xLite ]; then
     echo "0" > $PARAMS_ROOT/d/HardwareC3xLite
   fi
+
+  # Set default SWAGLOG_ROOT if not already set
+  if [ -z "$SWAGLOG_ROOT" ]; then
+    SWAGLOG_ROOT="$PWD/data/log"
+  fi
+  mkdir -p $SWAGLOG_ROOT
 fi
 
 function agnos_init {
