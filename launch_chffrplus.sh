@@ -4,6 +4,41 @@ DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null && pwd )"
 
 source "$DIR/launch_env.sh"
 
+# PC environment detection and configuration
+if [ ! -f /TICI ]; then
+  echo "Detected PC environment, applying PC-specific configuration..."
+
+  # Use ZMQ instead of msgq for IPC on PC
+  export ZMQ=1
+
+  # Default to using webcam on PC
+  export USE_WEBCAM=1
+
+  # Camera device configuration
+  # Road camera (required)
+  export ROAD_CAM=0
+  # Driver camera (optional, commented out for now)
+  # export DRIVER_CAM=2
+  # Wide camera (optional, commented out for now)
+  # export WIDE_CAM=4
+
+  # Set Python path
+  export PYTHONPATH="$PWD"
+
+  # Create necessary directories if they don't exist
+  mkdir -p /data/params/d /tmp/openpilot
+
+  # Set default language if not already set
+  if [ ! -f /data/params/d/LanguageSetting ]; then
+    echo "main_en" > /data/params/d/LanguageSetting
+  fi
+
+  # Set default hardware if not already set
+  if [ ! -f /data/params/d/HardwareC3xLite ]; then
+    echo "0" > /data/params/d/HardwareC3xLite
+  fi
+fi
+
 function agnos_init {
   # TODO: move this to agnos
   sudo rm -f /data/etc/NetworkManager/system-connections/*.nmmeta
@@ -66,7 +101,9 @@ function launch {
   fi
 
   # handle pythonpath
-  ln -sfn $(pwd) /data/pythonpath
+  if [ -w /data ]; then
+    ln -sfn $(pwd) /data/pythonpath
+  fi
   export PYTHONPATH="$PWD"
 
   # hardware specific init
@@ -74,8 +111,12 @@ function launch {
     agnos_init
   fi
 
-  # write tmux scrollback to a file
-  tmux capture-pane -pq -S-1500 > /tmp/launch_log
+  # write tmux scrollback to a file if tmux is available
+  if command -v tmux &> /dev/null && [ -n "$TMUX" ]; then
+    tmux capture-pane -pq -S-1500 > /tmp/launch_log
+  else
+    echo "Tmux not available, skipping scrollback capture"
+  fi
   if python -c "import flask" > /dev/null 2>&1; then
     echo "Flask already installed."
   else
@@ -112,14 +153,16 @@ function launch {
     cp -f $DIR/scripts/add/events_en.py $DIR/selfdrive/selfdrived/events.py
   fi
 
-  # c3xl amplifier file change
-  C3XL=$(cat /data/params/d/HardwareC3xLite)
+  # c3xl amplifier file change - only execute on TICI hardware
+  if [ -f /TICI ]; then
+    C3XL=$(cat /data/params/d/HardwareC3xLite)
 
-  if [ "${C3XL}" = "1" ] && [[ ! "${EVENTSTAT}" == *"modified:   system/hardware/tici/amplifier.py"* ]]; then
-    cp -f $DIR/system/hardware/tici/amplifier.py $DIR/scripts/add/amplifier_org.py
-    cp -f $DIR/scripts/add/amplifier_c3xl.py $DIR/system/hardware/tici/amplifier.py
-  elif [ "${C3XL}" = "0" ] && [[ "${EVENTSTAT}" == *"modified:   system/hardware/tici/amplifier.py"* ]]; then
-    cp -f $DIR/scripts/add/amplifier_org.py $DIR/system/hardware/tici/amplifier.py
+    if [ "${C3XL}" = "1" ] && [[ ! "${EVENTSTAT}" == *"modified:   system/hardware/tici/amplifier.py"* ]]; then
+      cp -f $DIR/system/hardware/tici/amplifier.py $DIR/scripts/add/amplifier_org.py
+      cp -f $DIR/scripts/add/amplifier_c3xl.py $DIR/system/hardware/tici/amplifier.py
+    elif [ "${C3XL}" = "0" ] && [[ "${EVENTSTAT}" == *"modified:   system/hardware/tici/amplifier.py"* ]]; then
+      cp -f $DIR/scripts/add/amplifier_org.py $DIR/system/hardware/tici/amplifier.py
+    fi
   fi
 
   # start manager
