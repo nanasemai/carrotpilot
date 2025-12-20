@@ -4,6 +4,7 @@ import requests
 from datetime import datetime, timedelta, UTC
 from openpilot.system.hardware.hw import Paths
 from openpilot.system.version import get_version
+from openpilot.common.swaglog import cloudlog
 
 API_HOST = os.getenv('API_HOST', 'https://api.commadotai.com')
 
@@ -37,10 +38,12 @@ class Api:
 
 
 def api_get(endpoint, method='GET', timeout=None, access_token=None, **params):
-  headers = {}
-  if access_token is not None:
-    headers['Authorization'] = "JWT " + access_token
+  # 禁用实际的API请求，返回模拟响应
+  class MockResponse:
+    def __init__(self):
+      self.status_code = 200
+      self.text = '{"result": "success", "message": "API requests disabled in PC version"}'
+      self.json = lambda: {"result": "success", "message": "API requests disabled in PC version"}
 
-  headers['User-Agent'] = "openpilot-" + get_version()
-
-  return requests.request(method, API_HOST + "/" + endpoint, timeout=timeout, headers=headers, params=params)
+  cloudlog.info(f"API request disabled: {method} {API_HOST}/{endpoint}")
+  return MockResponse()

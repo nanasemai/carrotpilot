@@ -11,7 +11,7 @@ import numpy as np
 import zmq
 from datetime import datetime
 
-from ftplib import FTP
+# from ftplib import FTP  # FTP导入已注释，因为FTP上传功能已禁用
 from cereal import log
 import cereal.messaging as messaging
 from openpilot.common.realtime import Ratekeeper
@@ -719,58 +719,11 @@ class CarrotMan:
       return
 
   def send_tmux(self, ftp_password, tmux_why, send_settings=False):
-
-    ftp_server = "shind0.synology.me"
-    ftp_port = 8021
-    ftp_username = "carrotpilot"
-    ftp = FTP()
-    ftp.connect(ftp_server, ftp_port)
-    ftp.login(ftp_username, ftp_password)
-    car_selected = Params().get("CarName")
-    if car_selected is None:
-      car_selected = "none"
-    else:
-      car_selected = car_selected.decode('utf-8')
-
-    git_branch = Params().get("GitBranch").decode('utf-8')
-    try:
-      ftp.mkd(git_branch)
-    except Exception as e:
-      print(f"Directory creation failed: {e}")
-    ftp.cwd(git_branch)
-
-    directory = car_selected + " " + Params().get("DongleId").decode('utf-8')
-    current_time = datetime.now().strftime("%Y%m%d-%H%M%S")
-    filename = tmux_why + "-" + current_time + "-" + git_branch + ".txt"
-
-    try:
-      ftp.mkd(directory)
-    except Exception as e:
-      print(f"Directory creation failed: {e}")
-    ftp.cwd(directory)
-
-    try:
-      # Use LOG_ROOT environment variable instead of hardcoded path
-      log_root = os.environ.get('LOG_ROOT', '/data/media/0/realdata')
-      tmux_log_path = os.path.join(log_root, 'tmux.log')
-      with open(tmux_log_path, "rb") as file:
-        ftp.storbinary(f'STOR {filename}', file)
-    except Exception as e:
-      print(f"ftp sending error...: {e}")
-
+    # FTP上传功能已禁用
+    print("FTP upload disabled: send_tmux method has been disabled")
+    # 保留save_toggle_values调用（如果需要）
     if send_settings:
       self.save_toggle_values()
-      try:
-        #with open("/data/backup_params.json", "rb") as file:
-        params_root = os.environ.get('PARAMS_ROOT', '/data/params')
-        data_dir = os.path.dirname(params_root)
-        file_path = os.path.join(data_dir, 'toggle_values.json')
-        with open(file_path, "rb") as file:
-          ftp.storbinary(f'STOR toggles-{current_time}.json', file)
-      except Exception as e:
-        print(f"ftp params sending error...: {e}")
-
-    ftp.quit()
 
   def carrot_panda_debug(self):
     #time.sleep(2)

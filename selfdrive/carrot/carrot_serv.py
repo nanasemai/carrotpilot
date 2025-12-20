@@ -10,7 +10,7 @@ import time
 import numpy as np
 from datetime import datetime
 
-from ftplib import FTP
+# from ftplib import FTP  # FTP导入已注释，因为FTP上传功能已禁用
 from cereal import log
 import cereal.messaging as messaging
 from openpilot.common.realtime import Ratekeeper
