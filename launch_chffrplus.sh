@@ -32,7 +32,7 @@ if [ ! -f /TICI ]; then
 
   # Set default language if not already set
   if [ ! -f $PARAMS_ROOT/d/LanguageSetting ]; then
-    echo "main_en" > $PARAMS_ROOT/d/LanguageSetting
+    echo -n "main_en" > $PARAMS_ROOT/d/LanguageSetting
   fi
 
   # Set default hardware if not already set

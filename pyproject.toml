@@ -47,6 +47,8 @@ dependencies = [
   # logging
   "pyzmq",
   "sentry-sdk",
+  "xattr",
+  "flask",
 
   # athena
   "PyJWT",
