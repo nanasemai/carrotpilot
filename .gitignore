@@ -80,6 +80,7 @@ selfdrive/modeld/models/*.pkl
 *.zst
 
 build/
+data/params/
 
 !**/.gitkeep
 

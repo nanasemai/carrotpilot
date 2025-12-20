@@ -4,38 +4,40 @@ DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null && pwd )"
 
 source "$DIR/launch_env.sh"
 
+# Load environment variables from .env file if it exists
+if [ -f "$DIR/.env" ]; then
+  source "$DIR/.env"
+else
+  # Set default environment variables if .env file doesn't exist
+  echo "No .env file found, setting default environment variables..."
+  # Users can manually add GPU support in .env file
+  # export DEV=AMD  # Use AMD GPU for model inference
+  # export DEV=NVIDIA  # Use NVIDIA GPU for model inference
+  export ZMQ=1         # Enable ZMQ for IPC
+  export USE_WEBCAM=1  # Enable webcam support
+  export ROAD_CAM=0    # Default road camera setting
+  export PYTHONPATH="$PWD"  # Set Python path
+fi
+
 # PC environment detection and configuration
 if [ ! -f /TICI ]; then
   echo "Detected PC environment, applying PC-specific configuration..."
 
-  # Use ZMQ instead of msgq for IPC on PC
-  export ZMQ=1
-
-  # Default to using webcam on PC
-  export USE_WEBCAM=1
-
-  # Camera device configuration
-  # Road camera (required)
-  export ROAD_CAM=0
-  # Driver camera (optional, commented out for now)
-  # export DRIVER_CAM=2
-  # Wide camera (optional, commented out for now)
-  # export WIDE_CAM=4
-
-  # Set Python path
-  export PYTHONPATH="$PWD"
-
   # Create necessary directories if they don't exist
-  mkdir -p /data/params/d /tmp/openpilot
+  # Set default PARAMS_ROOT if not already set
+  if [ -z "$PARAMS_ROOT" ]; then
+    PARAMS_ROOT="$PWD/data/params"
+  fi
+  mkdir -p $PARAMS_ROOT/d /tmp/openpilot
 
   # Set default language if not already set
-  if [ ! -f /data/params/d/LanguageSetting ]; then
-    echo "main_en" > /data/params/d/LanguageSetting
+  if [ ! -f $PARAMS_ROOT/d/LanguageSetting ]; then
+    echo "main_en" > $PARAMS_ROOT/d/LanguageSetting
   fi
 
   # Set default hardware if not already set
-  if [ ! -f /data/params/d/HardwareC3xLite ]; then
-    echo "0" > /data/params/d/HardwareC3xLite
+  if [ ! -f $PARAMS_ROOT/d/HardwareC3xLite ]; then
+    echo "0" > $PARAMS_ROOT/d/HardwareC3xLite
   fi
 fi
 
@@ -104,7 +106,10 @@ function launch {
   if [ -w /data ]; then
     ln -sfn $(pwd) /data/pythonpath
   fi
-  export PYTHONPATH="$PWD"
+  # Only set PYTHONPATH if not already set from .env
+  if [ -z "$PYTHONPATH" ]; then
+    export PYTHONPATH="$PWD"
+  fi
 
   # hardware specific init
   if [ -f /AGNOS ]; then
@@ -137,25 +142,36 @@ function launch {
   fi
 
   # events language init
-  #LANG=$(cat ${PARAMS_ROOT}/d/LanguageSetting)
-  LANG=$(cat /data/params/d/LanguageSetting)
+  # Set default PARAMS_ROOT if not already set
+  if [ -z "$PARAMS_ROOT" ]; then
+    PARAMS_ROOT="$PWD/data/params"
+  fi
+  LANG=$(cat $PARAMS_ROOT/d/LanguageSetting)
   EVENTSTAT=$(git status)
 
   # events.py 한글로 변경 및 파일이 교체된 상태인지 확인
-  if [ "${LANG}" = "main_ko" ] && [[ ! "${EVENTSTAT}" == *"modified:   selfdrive/controls/lib/events.py"* ]]; then
-    cp -f $DIR/selfdrive/selfdrived/events.py $DIR/scripts/add/events_en.py
+  if [ "${LANG}" = "main_ko" ] && [[ ! "${EVENTSTAT}" == *"modified:   selfdrive/selfdrived/events.py"* ]]; then
+    # Backup English version only if it doesn't exist yet
+    if [ ! -f "$DIR/scripts/add/events_en.py" ]; then
+      cp -f $DIR/selfdrive/selfdrived/events.py $DIR/scripts/add/events_en.py
+    fi
     cp -f $DIR/scripts/add/events_ko.py $DIR/selfdrive/selfdrived/events.py
-  elif [ "${LANG}" = "main_zh-CHS" ] && [[ ! "${EVENTSTAT}" == *"modified:   selfdrive/controls/lib/events.py"* ]]; then
-    # Backup current events.py (assumed English) and install Simplified Chinese events
-    cp -f $DIR/selfdrive/selfdrived/events.py $DIR/scripts/add/events_en.py
+  elif [ "${LANG}" = "main_zh-CHS" ] && [[ ! "${EVENTSTAT}" == *"modified:   selfdrive/selfdrived/events.py"* ]]; then
+    # Backup English version only if it doesn't exist yet
+    if [ ! -f "$DIR/scripts/add/events_en.py" ]; then
+      cp -f $DIR/selfdrive/selfdrived/events.py $DIR/scripts/add/events_en.py
+    fi
     cp -f $DIR/scripts/add/events_zh.py $DIR/selfdrive/selfdrived/events.py
-  elif [ "${LANG}" = "main_en" ] && [[ "${EVENTSTAT}" == *"modified:   selfdrive/controls/lib/events.py"* ]]; then
-    cp -f $DIR/scripts/add/events_en.py $DIR/selfdrive/selfdrived/events.py
+  elif [ "${LANG}" = "main_en" ] && [[ "${EVENTSTAT}" == *"modified:   selfdrive/selfdrived/events.py"* ]]; then
+    # Only restore English if backup exists
+    if [ -f "$DIR/scripts/add/events_en.py" ]; then
+      cp -f $DIR/scripts/add/events_en.py $DIR/selfdrive/selfdrived/events.py
+    fi
   fi
 
   # c3xl amplifier file change - only execute on TICI hardware
   if [ -f /TICI ]; then
-    C3XL=$(cat /data/params/d/HardwareC3xLite)
+    C3XL=$(cat $PARAMS_ROOT/d/HardwareC3xLite)
 
     if [ "${C3XL}" = "1" ] && [[ ! "${EVENTSTAT}" == *"modified:   system/hardware/tici/amplifier.py"* ]]; then
       cp -f $DIR/system/hardware/tici/amplifier.py $DIR/scripts/add/amplifier_org.py

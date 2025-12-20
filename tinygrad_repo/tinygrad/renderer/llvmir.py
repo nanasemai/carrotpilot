@@ -9,8 +9,8 @@ from tinygrad.dtype import dtypes, DType, PtrDType, truncate
 from tinygrad.helpers import prod, AMX
 
 def ldt(dt:DType):
-  if dt.vcount > 1: return f"<{dt.vcount} x {ldt(dt.scalar())}>"
   if isinstance(dt, PtrDType): return ldt(dt.base) + "*"
+  if dt.vcount > 1: return f"<{dt.vcount} x {ldt(dt.scalar())}>"
   return {dtypes.void: "void", dtypes.bool: "i1", dtypes.int8: "i8", dtypes.int16: "i16", dtypes.int32: "i32", dtypes.int64: "i64",
           dtypes.uint8: "i8", dtypes.uint16: "i16", dtypes.uint32: "i32", dtypes.uint64: "i64",
           dtypes.float16: "half", dtypes.bfloat16: "bfloat", dtypes.float32: "float", dtypes.float64: "double"}[dt]

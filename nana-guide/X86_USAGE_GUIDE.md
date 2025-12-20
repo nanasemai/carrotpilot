@@ -88,16 +88,22 @@ sudo ./tools/install_ubuntu_dependencies.sh
 
 ### 3.3 安装Python依赖
 
-项目使用uv包管理器管理Python依赖：
+项目使用uv包管理器管理Python依赖并自动创建虚拟环境：
 
 ```bash
 ./tools/install_python_dependencies.sh
 ```
 
 该脚本会：
-- 检查并安装uv（如果未安装）
+- 检查并安装uv包管理器（如果未安装）
+- 自动创建并激活`.venv`虚拟环境
 - 安装项目所需的所有Python依赖
 - 确保依赖版本与项目兼容
+- 智能管理`.env`文件：
+  - 如果`.env`文件不存在，自动创建并设置默认环境变量
+  - 如果`.env`文件已存在，仅添加缺失的环境变量（不覆盖现有配置）
+  - 不再默认添加`DEV`环境变量，用户需根据自己的GPU类型手动配置
+  - 默认启用ZMQ、USE_WEBCAM等必要配置
 
 ### 3.4 安装OpenCL驱动
 
@@ -285,14 +291,42 @@ clinfo
 
 ### 3.5 构建项目
 
-使用SCons构建项目：
+在构建项目之前，需要先激活Python虚拟环境，然后使用SCons构建项目。项目编译本身不依赖于`DEV`环境变量，但您可以通过设置`DEV`环境变量来指定运行时使用的GPU设备。
+
+#### 使用CPU构建（默认）
 
 ```bash
-# 自动检测架构并构建（-j$(nproc)表示使用所有CPU核心加速构建）
-scons -j$(nproc)
+# 激活Python虚拟环境
+source .venv/bin/activate
+
+# 自动检测架构并使用CPU构建（-j$(nproc)表示使用所有CPU核心加速构建，-u表示向上构建）
+scons -u -j$(nproc)
+```
+
+#### 使用GPU构建
+
+如果您的系统支持CUDA（NVIDIA GPU）或AMD GPU，可以设置`DEV`环境变量来启用GPU加速编译：
+
+```bash
+# 激活Python虚拟环境
+source .venv/bin/activate
+
+# 对于NVIDIA GPU（CUDA）
+export DEV=CUDA
+
+# 或者对于AMD GPU
+export DEV=AMD
+
+# 然后构建项目
+scons -u -j$(nproc)
 ```
 
 项目会自动检测您的架构（X86_64）并构建相应的版本。构建过程可能需要几分钟到几十分钟，具体取决于您的硬件性能。
+
+**注意：**
+1. 每次构建前都需要确保已激活Python虚拟环境，否则可能会出现依赖缺失或版本不匹配的错误。
+2. 要使用GPU构建，您需要确保已经按照第3.4节的说明正确安装了对应的GPU驱动和OpenCL支持。
+3. `DEV`环境变量会影响模型的编译目标设备，设置为CUDA或AMD可以让模型在GPU上运行，提高推理性能。
 
 ### 3.6 验证安装
 
@@ -312,53 +346,69 @@ python -c "import cereal.messaging; print('Cereal messaging module loaded succes
 
 ### 4.1 环境配置
 
-在运行carrotpilot之前，需要设置一些环境变量。创建一个环境配置文件：
+在运行carrotpilot之前，.env文件已经由`install_python_dependencies.sh`脚本自动创建和管理。该脚本会：
+- 如果.env文件不存在，自动创建并设置默认环境变量
+- 如果.env文件已存在，仅添加缺失的环境变量（不覆盖现有配置）
+- 不再默认添加`DEV`环境变量，用户需根据自己的GPU类型手动配置
+- 默认启用ZMQ、USE_WEBCAM等必要配置
+
+如果需要自定义配置，可以编辑.env文件：
 
 ```bash
-# 创建.env文件
-touch .env
+# 编辑.env文件
+nano .env
+```
 
-# 在PC上使用ZMQ替代msgq（X86平台必需）
-echo "export ZMQ=1" >> .env
+以下是一些常用的环境变量配置选项：
 
-# 设置Python路径
-echo "export PYTHONPATH=$(pwd)" >> .env
+```bash
+# 在PC上使用ZMQ替代msgq（X86平台必需，已默认设置）
+export ZMQ=1
 
-# 启用USB摄像头支持
-echo "export USE_WEBCAM=1" >> .env
+# 设置Python路径（已默认设置）
+export PYTHONPATH=$(pwd)
+
+# 启用USB摄像头支持（已默认设置）
+export USE_WEBCAM=1
 
 # 摄像头设备配置
 # 道路摄像头设备ID（必需，默认0对应/dev/video0）
-echo "export ROAD_CAM=0" >> .env
+export ROAD_CAM=0
 # 驾驶员摄像头设备ID（可选，默认2对应/dev/video2）
-# echo "export DRIVER_CAM=2" >> .env
+# export DRIVER_CAM=2
 # 广角摄像头设备ID（可选，默认4对应/dev/video4）
-# echo "export WIDE_CAM=4" >> .env
+# export WIDE_CAM=4
 
 # OpenCL配置（carrotpilot默认启用OpenCL加速）
 # carrotpilot会自动检测并使用可用的OpenCL设备，优先选择GPU设备
 # 如果GPU不可用，会尝试使用CPU设备进行AI模型推理
-# 以下环境变量可用于手动控制OpenCL行为：
 
 # 查看可用OpenCL设备（调试用）
-# echo "export OPENCL_SHOW_DEVICES=1" >> .env
+# export OPENCL_SHOW_DEVICES=1
 
 # 手动指定OpenCL设备（可选，默认自动选择）
-# echo "export OPENCL_DEVICE=0" >> .env
+# export OPENCL_DEVICE=0
 
 # 禁用OpenCL（强制使用CPU）
-# echo "export DISABLE_OPENCL=1" >> .env
+# export DISABLE_OPENCL=1
+
+# Tinygrad设备配置（用户需根据GPU类型手动配置）
+# 对于NVIDIA GPU，可以设置为CUDA
+# export DEV=CUDA
 
 # 设置UI缩放比例（可选，根据屏幕分辨率调整）
-# echo "export SCALE=2" >> .env
+# export SCALE=2
 
 # 禁用电源节省模式（可选，提高性能）
-# echo "export POWER_SAVE=0" >> .env
+# export POWER_SAVE=0
 
 # 设置CPU线程数（可选，根据硬件调整）
-# echo "export OMP_NUM_THREADS=8" >> .env
+# export OMP_NUM_THREADS=8
+```
 
-# 应用环境变量
+编辑完成后，应用环境变量：
+
+```bash
 source .env
 ```
 
