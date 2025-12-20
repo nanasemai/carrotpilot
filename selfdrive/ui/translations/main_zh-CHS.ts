@@ -777,31 +777,31 @@
     </message>
     <message>
         <source>AChangeCostStarting</source>
-        <translation type="unfinished"></translation>
+        <translation>变道启动成本</translation>
     </message>
     <message>
         <source>TrafficStopDistanceAdjust</source>
-        <translation type="unfinished"></translation>
+        <translation>交通停车距离调整</translation>
     </message>
     <message>
         <source>LAT:LatSmoothSec(13)</source>
-        <translation type="unfinished"></translation>
+        <translation>横向：横向平滑时间(13)</translation>
     </message>
     <message>
         <source>Hardware is C3x Lite</source>
-        <translation type="unfinished"></translation>
+        <translation>硬件版本为 C3x Lite</translation>
     </message>
     <message>
         <source>Smart Speed Control(0)</source>
-        <translation type="unfinished"></translation>
+        <translation>智能速度控制(0)</translation>
     </message>
     <message>
         <source>0: off, 1:accel, 2:decel, 3: all</source>
-        <translation type="unfinished"></translation>
+        <translation>0: 关闭, 1:加速, 2:减速, 3: 全部</translation>
     </message>
     <message>
         <source>Model TurnSpeed Factor(0)</source>
-        <translation type="unfinished"></translation>
+        <translation>模型转向速度因子(0)</translation>
     </message>
 </context>
 <context>
