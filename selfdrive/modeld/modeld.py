@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 import os
 from openpilot.system.hardware import TICI
-os.environ['DEV'] = 'QCOM' if TICI else 'AMD'  # 默认使用AMD GPU
+os.environ['DEV'] = 'QCOM' if TICI else 'CL'  # 使用OpenCL运行
 USBGPU = "USBGPU" in os.environ
 if USBGPU:
   os.environ['DEV'] = 'AMD'
