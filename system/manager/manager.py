@@ -32,7 +32,7 @@ def get_default_params():
     ("OpenpilotEnabledToggle", "1"),
     ("LongitudinalPersonality", str(log.LongitudinalPersonality.standard)),
     ("IsMetric", "1"),
-    ("RecordAudio", "1"),
+    ("RecordAudio", "0"),
     ("SearchInput", "0"),
     ("GMapKey", "0"),
     ("MapboxStyle", "0"),
