@@ -39,10 +39,11 @@ if [ ! -f /TICI ]; then
     echo -n "main_en" > $PARAMS_ROOT/d/LanguageSetting
   fi
 
-  # Set default hardware if not already set
-  if [ ! -f $PARAMS_ROOT/d/HardwareC3xLite ]; then
-    echo "0" > $PARAMS_ROOT/d/HardwareC3xLite
-  fi
+  # Set HardwareC3xLite to 1 by default (forced)
+  echo "1" > $PARAMS_ROOT/d/HardwareC3xLite
+
+  # Set DisableDM to 1 by default (forced)
+  echo "1" > $PARAMS_ROOT/d/DisableDM
 
   # Set default SWAGLOG_ROOT if not already set
   if [ -z "$SWAGLOG_ROOT" ]; then
