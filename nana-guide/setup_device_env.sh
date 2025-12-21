@@ -22,12 +22,12 @@ else
   echo "PYTHONPATH=${PWD}" >> "$ROOT"/.env
 fi
 
-# Set DEV to AMD for GPU support
-echo "Setting DEV=AMD for GPU support..."
+# Set DEV to CL for GPU support
+echo "Setting DEV=CL for GPU support..."
 if grep -q "export DEV=" "$ROOT"/.env; then
-  sed -i 's/.*export DEV=.*/export DEV=AMD  # Use AMD GPU for model inference (Ryzen 7 4700U with Radeon Graphics)/' "$ROOT"/.env
+  sed -i 's/.*export DEV=.*/export DEV=CL  # Use OPENCL GPU for model inference (Ryzen 7 4700U with Radeon Graphics)/' "$ROOT"/.env
 else
-  echo "export DEV=AMD  # Use AMD GPU for model inference (Ryzen 7 4700U with Radeon Graphics)" >> "$ROOT"/.env
+  echo "export DEV=CL  # Use OPENCL GPU for model inference (Ryzen 7 4700U with Radeon Graphics)" >> "$ROOT"/.env
 fi
 
 # Enable ZMQ for IPC
@@ -98,6 +98,14 @@ if grep -q "export LOG_READABLE=" "$ROOT"/.env; then
   sed -i 's/.*export LOG_READABLE=.*/export LOG_READABLE=1  # Enable human-readable log format/' "$ROOT"/.env
 else
   echo "export LOG_READABLE=1  # Enable human-readable log format" >> "$ROOT"/.env
+fi
+
+# Set IMAGE=0 for CL device
+echo "Setting IMAGE=0 for CL device..."
+if grep -q "export IMAGE=" "$ROOT"/.env; then
+  sed -i 's/.*export IMAGE=.*/export IMAGE=0  # Required for CL device (OpenCL) image handling/' "$ROOT"/.env
+else
+  echo "export IMAGE=0  # Required for CL device (OpenCL) image handling" >> "$ROOT"/.env
 fi
 
 echo ""
