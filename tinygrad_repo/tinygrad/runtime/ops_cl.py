@@ -1,6 +1,6 @@
 from __future__ import annotations
 from typing import cast
-import ctypes, functools, hashlib
+import ctypes, functools, hashlib, os
 from tinygrad.runtime.autogen import opencl as cl
 from tinygrad.helpers import init_c_var, to_char_p_p, from_mv, OSX, DEBUG, mv_address, suppress_finalizing
 from tinygrad.renderer.cstyle import OpenCLRenderer, IntelRenderer
@@ -20,7 +20,29 @@ class CLCompiler(Compiler):
     super().__init__(f"compile_cl_{compile_key}")
   def compile(self, src:str) -> bytes:
     program = checked(cl.clCreateProgramWithSource(self.dev.context, 1, to_char_p_p([src.encode()]), None, status := ctypes.c_int32()), status)
-    build_status: int = cl.clBuildProgram(program, 1, self.dev.device_id, None, cl.clBuildProgram.argtypes[4](), None)
+
+    # 设置编译选项以支持多个AMD GPU架构
+    build_options = "-cl-std=CL2.0 -cl-mad-enable -cl-fast-relaxed-math -cl-unsafe-math-optimizations -fno-code-embed".encode()
+
+    # 从环境变量获取目标架构信息
+    target_arch = os.environ.get("TARGET_ARCH")
+    if target_arch:
+      print(f"CLCompiler: Using target architecture from environment variable: {target_arch}")
+      # 为特定架构添加编译选项
+      if "AMD" in self.dev.device_name or "Radeon" in self.dev.device_name:
+        # 对于AMD GPU，使用-arch选项指定目标架构
+        build_options += f" -arch {target_arch}".encode()
+    elif "AMD" in self.dev.device_name or "Radeon" in self.dev.device_name:
+      # 自动检测AMD GPU架构
+      if self.dev.device_arch:
+        print(f"CLCompiler: Detected AMD GPU: {self.dev.device_name}, using architecture: {self.dev.device_arch}")
+        build_options += f" -arch {self.dev.device_arch}".encode()
+      else:
+        print(f"CLCompiler: Warning: Could not detect architecture for AMD GPU: {self.dev.device_name}")
+        print(f"CLCompiler: Compiling without specific architecture optimization")
+        print(f"CLCompiler: You can specify the correct architecture using TARGET_ARCH environment variable")
+
+    build_status: int = cl.clBuildProgram(program, 1, self.dev.device_id, build_options, cl.clBuildProgram.argtypes[4](), None)
     if build_status != 0:
       cl.clGetProgramBuildInfo(program, self.dev.device_id, cl.CL_PROGRAM_BUILD_LOG, 0, None, log_size := ctypes.c_size_t())
       cl.clGetProgramBuildInfo(program, self.dev.device_id, cl.CL_PROGRAM_BUILD_LOG,
@@ -39,7 +61,13 @@ class CLProgram:
                                                         to_char_p_p([lib], ctypes.c_ubyte), binary_status := ctypes.c_int32(),
                                                         errcode_ret := ctypes.c_int32()), errcode_ret)
     check(binary_status.value)
-    check(cl.clBuildProgram(self.program, 1, device.device_id, None, cl.clBuildProgram.argtypes[4](), None)) # NOTE: OSX requires this
+    # 添加构建日志打印
+    build_status = cl.clBuildProgram(self.program, 1, device.device_id, None, cl.clBuildProgram.argtypes[4](), None)
+    if build_status != 0:
+      cl.clGetProgramBuildInfo(self.program, device.device_id, cl.CL_PROGRAM_BUILD_LOG, 0, None, log_size := ctypes.c_size_t())
+      cl.clGetProgramBuildInfo(self.program, device.device_id, cl.CL_PROGRAM_BUILD_LOG,
+                               log_size.value, mstr := ctypes.create_string_buffer(log_size.value), None)
+      raise RuntimeError(f"OpenCL Build Error {build_status}: {mstr.value.decode()}")
     self.kernel = checked(cl.clCreateKernel(self.program, name.encode(), status := ctypes.c_int32()), status)
 
   def __del__(self):
@@ -107,7 +135,6 @@ class CLDevice(Compiled):
                                            buf:=ctypes.create_string_buffer(256), None), buf.value.decode())[1]
     self.driver_version = (cl.clGetDeviceInfo(self.device_id, cl.CL_DRIVER_VERSION, 256,
                                               buf:=ctypes.create_string_buffer(256), None), buf.value.decode())[1]
-    if DEBUG >= 1: print(f"CLDevice: opening {self.device_name} with version {self.driver_version}")
     self.context = checked(cl.clCreateContext(None, 1, self.device_id, cl.clCreateContext.argtypes[3](), None, status := ctypes.c_int32()), status)
     self.queue = checked(cl.clCreateCommandQueue(self.context, self.device_id, cl.CL_QUEUE_PROFILING_ENABLE, status), status)
     self.pending_copyin: list[memoryview] = []
@@ -116,8 +143,59 @@ class CLDevice(Compiled):
                                            ctypes.byref(total := ctypes.c_size_t())),
                                            ctypes.string_at(buf, size=total.value).decode())[1]
 
+    # 获取GPU架构信息
+    self.device_arch = ""
+    if "AMD" in self.device_name or "Radeon" in self.device_name:
+      # 尝试获取AMD特定的设备信息
+      try:
+        # 对于AMD GPU，我们可以尝试获取设备的GPU代码名称
+        # 通过设备名称推断架构信息
+        if "Vega" in self.device_name:
+          self.device_arch = "gfx900"
+        elif "Renoir" in self.device_name or "Ryzen" in self.device_name:
+          # Ryzen 7 4700U集成的Renoir GPU
+          self.device_arch = "gfx90c"
+        elif "Navi 1" in self.device_name:
+          self.device_arch = "gfx1010"
+        elif "Navi 2" in self.device_name:
+          self.device_arch = "gfx1030"
+        elif "Navi 3" in self.device_name:
+          self.device_arch = "gfx1100"
+        elif "RDNA" in self.device_name:
+          # 支持RDNA架构系列
+          if "RDNA 1" in self.device_name or "RDNA1" in self.device_name:
+            self.device_arch = "gfx1010"
+          elif "RDNA 2" in self.device_name or "RDNA2" in self.device_name:
+            self.device_arch = "gfx1030"
+          elif "RDNA 3" in self.device_name or "RDNA3" in self.device_name:
+            self.device_arch = "gfx1100"
+          else:
+            self.device_arch = "gfx1010"  # 默认RDNA架构
+        else:
+          # 对于不在预定义列表中的AMD设备，默认使用gfx900（Vega）架构
+          # 用户可以通过设置TARGET_ARCH环境变量来指定正确的架构
+          self.device_arch = "gfx900"
+          if DEBUG >= 1:
+            print(f"CLDevice: unknown AMD GPU model '{self.device_name}', using default architecture {self.device_arch}")
+            print(f"CLDevice: you can override this by setting the TARGET_ARCH environment variable")
+        if DEBUG >= 1: print(f"CLDevice: extensions {self.device_exts}")
+      except Exception as e:
+        if DEBUG >= 1: print(f"CLDevice: failed to get architecture info: {e}")
+        # 发生错误时，仍然使用默认架构
+        self.device_arch = "gfx900"
+
+    if DEBUG >= 1: print(f"CLDevice: opening {self.device_name} with version {self.driver_version}, arch {self.device_arch}")
+
+    # 获取TARGET_ARCH环境变量并包含在缓存键中
+    target_arch = os.environ.get("TARGET_ARCH", "")
+    # 创建包含设备名称、驱动版本和目标架构的缓存键
+    cache_key = hashlib.md5(
+      self.device_name.encode() +
+      self.driver_version.encode() +
+      target_arch.encode()
+    ).hexdigest()
     compilers = [(IntelRenderer if "cl_intel_subgroup_matrix_multiply_accumulate" in self.device_exts else OpenCLRenderer,
-      functools.partial(CLCompiler, self, f"compile_cl_{hashlib.md5(self.device_name.encode() + self.driver_version.encode()).hexdigest()}"))]
+      functools.partial(CLCompiler, self, f"compile_cl_{cache_key}"))]
     super().__init__(device, CLAllocator(self), compilers, functools.partial(CLProgram, self))
   def synchronize(self):
     check(cl.clFinish(self.queue))

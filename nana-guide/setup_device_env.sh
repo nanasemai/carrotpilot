@@ -100,16 +100,6 @@ else
   echo "export LOG_READABLE=1  # Enable human-readable log format" >> "$ROOT"/.env
 fi
 
-# Add AMD-specific optimizations
-echo "Adding AMD-specific optimizations..."
-if ! grep -q "export AMD_IFACE=" "$ROOT"/.env; then
-  echo "export AMD_IFACE=USB  # AMD interface type for Ryzen 7 4700U" >> "$ROOT"/.env
-fi
-
-if ! grep -q "export AMD_LLVM=" "$ROOT"/.env; then
-  echo "export AMD_LLVM=1  # Enable LLVM for AMD GPU optimization" >> "$ROOT"/.env
-fi
-
 echo ""
 echo ".env file setup complete for AMD Ryzen 7 4700U with Radeon Graphics!"
 echo "Contents of .env file:"

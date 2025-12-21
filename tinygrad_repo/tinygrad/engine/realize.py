@@ -91,7 +91,7 @@ class CompiledRunner(Runner):
     self._prg = Device[p.device].runtime(p.function_name, self.lib) if prg is None else prg
     super().__init__(p.name, p.device, p.estimates)
 
-  def __reduce__(self): return self.__class__, (self.p, self.lib)
+  def __reduce__(self): return self.__class__, (self.p, None)
 
   def __call__(self, rawbufs:list[Buffer], var_vals:dict[str, int]|None=None, wait=False) -> float|None:
     if var_vals is None: var_vals = {}
