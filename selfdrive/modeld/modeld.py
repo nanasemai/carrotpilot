@@ -33,6 +33,10 @@ from openpilot.selfdrive.modeld.constants import ModelConstants, Plan
 from openpilot.selfdrive.modeld.models.commonmodel_pyx import DrivingModelFrame, CLContext
 from openpilot.selfdrive.modeld.runners.tinygrad_helpers import qcom_tensor_from_opencl_address
 
+# 添加设备类型日志
+from tinygrad.device import Device
+cloudlog.info(f"当前使用的设备类型: {Device.DEFAULT}")
+
 
 PROCESS_NAME = "selfdrive.modeld.modeld"
 SEND_RAW_PRED = os.getenv('SEND_RAW_PRED')
@@ -198,10 +202,13 @@ class ModelState:
 
     if TICI and not USBGPU:
       # The imgs tensors are backed by opencl memory, only need init once
+      cloudlog.info("使用QCOM后端运行模型，使用OPENCL内存支持的张量")
       for key in imgs_cl:
         if key not in self.vision_inputs:
           self.vision_inputs[key] = qcom_tensor_from_opencl_address(imgs_cl[key].mem_address, self.vision_input_shapes[key], dtype=dtypes.uint8)
     else:
+      device_type = "AMD GPU" if USBGPU else "CPU"
+      cloudlog.info(f"使用{device_type}后端运行模型")
       for key in imgs_cl:
         frame_input = self.frames[key].buffer_from_cl(imgs_cl[key]).reshape(self.vision_input_shapes[key])
         self.vision_inputs[key] = Tensor(frame_input, dtype=dtypes.uint8).realize()
