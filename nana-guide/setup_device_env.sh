@@ -100,6 +100,14 @@ else
   echo "export LOG_READABLE=1  # Enable human-readable log format" >> "$ROOT"/.env
 fi
 
+# Enable FPS display for debugging
+echo "Enabling FPS display..."
+if grep -q "export DEBUG_FPS=" "$ROOT"/.env; then
+  sed -i 's/.*export DEBUG_FPS=.*/export DEBUG_FPS=1  # Enable FPS display for debugging/' "$ROOT"/.env
+else
+  echo "export DEBUG_FPS=1  # Enable FPS display for debugging" >> "$ROOT"/.env
+fi
+
 # Set IMAGE=0 for CL device
 echo "Setting IMAGE=0 for CL device..."
 if grep -q "export IMAGE=" "$ROOT"/.env; then

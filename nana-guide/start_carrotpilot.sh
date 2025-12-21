@@ -29,12 +29,6 @@ else
     echo "[INFO] 继续使用当前环境启动..."
 fi
 
-# 设置必要的环境变量
-export PYTHONPATH="$PROJECT_ROOT"
-export ZMQ=1
-export USE_WEBCAM=1
-export LOG_READABLE=1
-
 # 确保必要目录存在
 mkdir -p "$PROJECT_ROOT/data/params/d"
 mkdir -p "/tmp/openpilot"
