@@ -1,11 +1,20 @@
 #!/usr/bin/env python3
 import os
 from openpilot.system.hardware import TICI
-os.environ['DEV'] = 'QCOM' if TICI else 'CL'
+
+# 检测AMD GPU支持
+AMD = "AMD" in os.environ or "amd" in os.environ
 USBGPU = "USBGPU" in os.environ
-if USBGPU:
+
+# 设置后端
+if TICI and not USBGPU:
+  os.environ['DEV'] = 'QCOM'
+elif USBGPU or AMD:
   os.environ['DEV'] = 'AMD'
-  os.environ['AMD_IFACE'] = 'USB'
+  if USBGPU:
+    os.environ['AMD_IFACE'] = 'USB'
+else:
+  os.environ['DEV'] = 'CL'
 from tinygrad.tensor import Tensor
 from tinygrad.dtype import dtypes
 import time
@@ -158,6 +167,16 @@ class ModelState:
       self.vision_output_slices = vision_metadata['output_slices']
       vision_output_size = vision_metadata['output_shapes']['outputs'][1]
 
+    # 确定当前使用的后端类型（只打印一次）
+    device_type = "CPU"
+    if TICI and not USBGPU:
+      device_type = "QCOM GPU"
+    elif USBGPU or AMD:
+      device_type = "AMD GPU"
+    elif os.environ.get('DEV') == 'CL':
+      device_type = "CL GPU"
+    cloudlog.info(f"使用{device_type}后端运行模型")
+
     with open(POLICY_METADATA_PATH, 'rb') as f:
       policy_metadata = pickle.load(f)
       self.policy_input_shapes =  policy_metadata['input_shapes']
@@ -202,13 +221,10 @@ class ModelState:
 
     if TICI and not USBGPU:
       # The imgs tensors are backed by opencl memory, only need init once
-      cloudlog.info("使用QCOM后端运行模型，使用OPENCL内存支持的张量")
       for key in imgs_cl:
         if key not in self.vision_inputs:
           self.vision_inputs[key] = qcom_tensor_from_opencl_address(imgs_cl[key].mem_address, self.vision_input_shapes[key], dtype=dtypes.uint8)
     else:
-      device_type = "AMD GPU" if USBGPU else "CPU"
-      cloudlog.info(f"使用{device_type}后端运行模型")
       for key in imgs_cl:
         frame_input = self.frames[key].buffer_from_cl(imgs_cl[key]).reshape(self.vision_input_shapes[key])
         self.vision_inputs[key] = Tensor(frame_input, dtype=dtypes.uint8).realize()

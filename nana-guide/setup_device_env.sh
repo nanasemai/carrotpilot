@@ -30,6 +30,16 @@ else
   echo "export DEV=CL  # Use OPENCL GPU for model inference (Ryzen 7 4700U with Radeon Graphics)" >> "$ROOT"/.env
 fi
 
+# Ensure AMD and USBGPU variables are not set (to use CL backend)
+echo "Ensuring AMD and USBGPU variables are not set..."
+if grep -q "export AMD=" "$ROOT"/.env; then
+  sed -i '/export AMD=/d' "$ROOT"/.env
+fi
+
+if grep -q "export USBGPU=" "$ROOT"/.env; then
+  sed -i '/export USBGPU=/d' "$ROOT"/.env
+fi
+
 # Enable ZMQ for IPC
 echo "Enabling ZMQ for IPC..."
 if grep -q "export ZMQ=" "$ROOT"/.env; then
@@ -59,7 +69,7 @@ echo "Disabling driver camera..."
 if grep -q "export DRIVER_CAM=" "$ROOT"/.env; then
   sed -i 's/.*export DRIVER_CAM=.*/export DRIVER_CAM=""  # Disable driver camera/' "$ROOT"/.env
 else
-  echo "export DRIVER_CAM=""  # Disable driver camera" >> "$ROOT"/.env
+  echo 'export DRIVER_CAM=""  # Disable driver camera' >> "$ROOT"/.env
 fi
 
 # Disable wide camera (set to empty to prevent access to wide camera device)
@@ -67,7 +77,7 @@ echo "Disabling wide camera..."
 if grep -q "export WIDE_CAM=" "$ROOT"/.env; then
   sed -i 's/.*export WIDE_CAM=.*/export WIDE_CAM=""  # Disable wide camera/' "$ROOT"/.env
 else
-  echo "export WIDE_CAM=""  # Disable wide camera" >> "$ROOT"/.env
+  echo 'export WIDE_CAM=""  # Disable wide camera' >> "$ROOT"/.env
 fi
 
 # Set parameter directory to project root for PC environment
