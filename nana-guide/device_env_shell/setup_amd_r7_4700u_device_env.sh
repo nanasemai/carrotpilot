@@ -174,6 +174,6 @@ echo ""
 echo "Note: If you experience issues with GPU architecture detection, you can manually specify it by editing the .env file and uncommenting the TARGET_ARCH line."
 echo "Example: For NVIDIA GT640M, you might use export TARGET_ARCH=compute_30"
 echo ""
-echo "Additional OpenCL controls available:
+echo "Additional OpenCL controls available:"
 echo "- CL_ARCH_DETECTION: Enable AMD architecture auto-detection (only works when explicitly set to 1)"
 echo "- CL_OPTIMIZATION_LEVEL: Adjust compilation optimization (0=none, 2=aggressive, default=use OpenCL defaults)"
