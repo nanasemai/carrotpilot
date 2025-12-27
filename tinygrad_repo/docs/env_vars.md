@@ -47,6 +47,10 @@ VIZ                 | [1]        | 0=disabled, 1=[viz enabled](https://github.co
 ALLOW_TF32          | [1]        | enable TensorFloat-32 tensor cores on Ampere or newer GPUs.
 WEBGPU_BACKEND      | [WGPUBackendType_Metal, ...]          | Force select a backend for WebGPU (Metal, DirectX, OpenGL, Vulkan...)
 CUDA_PATH           | str        | Use `CUDA_PATH/include` for CUDA headers for CUDA and NV backends. If not set, TinyGrad will use `/usr/local/cuda/include`, `/usr/include` and `/opt/cuda/include`.
+CL_HALF             | [0-1]      | Control OpenCL half-precision support (0=disabled, 1=enabled, default=1)
+CL_INT64            | [0-1]      | Control OpenCL 64-bit integer support (0=disabled, 1=enabled, default=1)
+CL_ARCH_DETECTION   | [1]        | Enable AMD GPU architecture auto-detection (only works when explicitly set to 1)
+CL_OPTIMIZATION_LEVEL | [0-2]    | Control OpenCL compilation optimization level (0=none, 2=aggressive, default=use OpenCL defaults)
 
 ## Debug breakdown
 

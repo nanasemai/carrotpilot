@@ -155,11 +155,31 @@ fi
 # Set CL_OPTIMIZATION_LEVEL with repeatable execution support
 echo "Setting CL_OPTIMIZATION_LEVEL..."
 if grep -q "export CL_OPTIMIZATION_LEVEL=" "$ROOT"/.env; then
-  sed -i 's/.*export CL_OPTIMIZATION_LEVEL=.*/# export CL_OPTIMIZATION_LEVEL=1  # Standard optimization for general use (0=none, 2=aggressive, default=use OpenCL defaults)/' "$ROOT"/.env
+  sed -i 's/.*export CL_OPTIMIZATION_LEVEL=.*/export CL_OPTIMIZATION_LEVEL=0  # Conservative optimization for older NVIDIA GPU (0=none, 2=aggressive, default=use OpenCL defaults)/' "$ROOT"/.env
 else
   echo "" >> "$ROOT"/.env
   echo "# CL_OPTIMIZATION_LEVEL - Control OpenCL compilation optimization level (0=none, 2=aggressive, default=use OpenCL defaults)" >> "$ROOT"/.env
-  echo "# export CL_OPTIMIZATION_LEVEL=1  # Standard optimization for general use" >> "$ROOT"/.env
+  echo "export CL_OPTIMIZATION_LEVEL=0  # Conservative optimization for older NVIDIA GPU" >> "$ROOT"/.env
+fi
+
+# Set CL_HALF with repeatable execution support (disable for GT640M)
+echo "Setting CL_HALF..."
+if grep -q "export CL_HALF=" "$ROOT"/.env; then
+  sed -i 's/.*export CL_HALF=.*/export CL_HALF=0  # Disable half-precision support for older NVIDIA GPU (0=disabled, 1=enabled, default=1)/' "$ROOT"/.env
+else
+  echo "" >> "$ROOT"/.env
+  echo "# CL_HALF - Control OpenCL half-precision support (0=disabled, 1=enabled, default=1)" >> "$ROOT"/.env
+  echo "export CL_HALF=0  # Disable half-precision support for older NVIDIA GPU" >> "$ROOT"/.env
+fi
+
+# Set CL_INT64 with repeatable execution support (disable for GT640M)
+echo "Setting CL_INT64..."
+if grep -q "export CL_INT64=" "$ROOT"/.env; then
+  sed -i 's/.*export CL_INT64=.*/export CL_INT64=0  # Disable 64-bit integer support for older NVIDIA GPU (0=disabled, 1=enabled, default=1)/' "$ROOT"/.env
+else
+  echo "" >> "$ROOT"/.env
+  echo "# CL_INT64 - Control OpenCL 64-bit integer support (0=disabled, 1=enabled, default=1)" >> "$ROOT"/.env
+  echo "export CL_INT64=0  # Disable 64-bit integer support for older NVIDIA GPU" >> "$ROOT"/.env
 fi
 
 echo ""
@@ -177,3 +197,5 @@ echo ""
 echo "Additional OpenCL controls available:
 echo "- CL_ARCH_DETECTION: Enable AMD architecture auto-detection (only works when explicitly set to 1)"
 echo "- CL_OPTIMIZATION_LEVEL: Adjust compilation optimization (0=none, 2=aggressive, default=use OpenCL defaults)"
+echo "- CL_HALF: Control half-precision support (0=disabled, 1=enabled, default=1)"
+echo "- CL_INT64: Control 64-bit integer support (0=disabled, 1=enabled, default=1)"

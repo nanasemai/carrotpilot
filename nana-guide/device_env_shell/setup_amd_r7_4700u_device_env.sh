@@ -146,20 +146,20 @@ echo "Adding OpenCL specific environment variables..."
 # Set CL_ARCH_DETECTION with repeatable execution support
 echo "Setting CL_ARCH_DETECTION..."
 if grep -q "export CL_ARCH_DETECTION=" "$ROOT"/.env; then
-  sed -i 's/.*export CL_ARCH_DETECTION=.*/# export CL_ARCH_DETECTION=1  # Enable AMD GPU architecture auto-detection (only works when explicitly set to 1)/' "$ROOT"/.env
+  sed -i 's/.*export CL_ARCH_DETECTION=.*/export CL_ARCH_DETECTION=1  # Enable AMD architecture detection for Renoir GPU (only works when explicitly set to 1)/' "$ROOT"/.env
 else
   echo "# CL_ARCH_DETECTION - Enable AMD GPU architecture auto-detection (only works when explicitly set to 1)" >> "$ROOT"/.env
-  echo "# export CL_ARCH_DETECTION=1" >> "$ROOT"/.env
+  echo "export CL_ARCH_DETECTION=1  # Enable AMD architecture detection for Renoir GPU" >> "$ROOT"/.env
 fi
 
 # Set CL_OPTIMIZATION_LEVEL with repeatable execution support
 echo "Setting CL_OPTIMIZATION_LEVEL..."
 if grep -q "export CL_OPTIMIZATION_LEVEL=" "$ROOT"/.env; then
-  sed -i 's/.*export CL_OPTIMIZATION_LEVEL=.*/# export CL_OPTIMIZATION_LEVEL=1  # Standard optimization for general use (0=none, 2=aggressive, default=use OpenCL defaults)/' "$ROOT"/.env
+  sed -i 's/.*export CL_OPTIMIZATION_LEVEL=.*/export CL_OPTIMIZATION_LEVEL=2  # Aggressive optimization for AMD Renoir GPU (0=none, 2=aggressive, default=use OpenCL defaults)/' "$ROOT"/.env
 else
   echo "" >> "$ROOT"/.env
   echo "# CL_OPTIMIZATION_LEVEL - Control OpenCL compilation optimization level (0=none, 2=aggressive, default=use OpenCL defaults)" >> "$ROOT"/.env
-  echo "# export CL_OPTIMIZATION_LEVEL=1  # Standard optimization for general use" >> "$ROOT"/.env
+  echo "export CL_OPTIMIZATION_LEVEL=2  # Aggressive optimization for AMD Renoir GPU" >> "$ROOT"/.env
 fi
 
 echo ""

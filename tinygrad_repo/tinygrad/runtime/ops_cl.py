@@ -2,9 +2,10 @@ from __future__ import annotations
 from typing import cast
 import ctypes, functools, hashlib, os
 from tinygrad.runtime.autogen import opencl as cl
-from tinygrad.helpers import init_c_var, to_char_p_p, from_mv, OSX, DEBUG, mv_address, suppress_finalizing
-from tinygrad.renderer.cstyle import OpenCLRenderer, IntelRenderer
+from tinygrad.helpers import init_c_var, to_char_p_p, from_mv, OSX, DEBUG, mv_address, suppress_finalizing, getenv
+from tinygrad.renderer.cstyle import OpenCLRenderer, IntelRenderer, create_non_native_float_pats, extra_pm
 from tinygrad.device import BufferSpec, LRUAllocator, Compiled, Compiler, CompileError
+from tinygrad.dtype import dtypes
 
 # see test/external/external_osx_profiling.py to determine this ratio. it's in like GPU clocks or something
 OSX_TIMING_RATIO = (125/3) if OSX else 1.0
@@ -21,47 +22,23 @@ class CLCompiler(Compiler):
   def compile(self, src:str) -> bytes:
     program = checked(cl.clCreateProgramWithSource(self.dev.context, 1, to_char_p_p([src.encode()]), None, status := ctypes.c_int32()), status)
 
-    # 设置基础编译选项
-    build_options = "-cl-std=CL1.2 -cl-mad-enable -cl-fast-relaxed-math -cl-unsafe-math-optimizations".encode()
+    # 简化的编译选项控制：只在用户明确设置时使用
+    build_options = None
+    optimization_level = getenv("CL_OPTIMIZATION_LEVEL", "")
 
-    # 从环境变量获取目标架构信息
+    if optimization_level == "0":
+      # 禁用优化（用户明确设置）
+      build_options = None  # 不使用任何优化选项
+    elif optimization_level == "2":
+      # 激进优化（用户明确设置）
+      build_options = "-cl-mad-enable -cl-fast-relaxed-math -cl-unsafe-math-optimizations".encode()
+    # 默认情况（包括optimization_level=1或未设置）使用原始行为（None）
+
+    # 简化的架构支持：只在TARGET_ARCH明确设置时使用
     target_arch = os.environ.get("TARGET_ARCH")
-    device_type = "Unknown"
-
-    # 识别设备类型
-    if "AMD" in self.dev.device_name or "Radeon" in self.dev.device_name:
-      device_type = "AMD"
-    elif "NVIDIA" in self.dev.device_name or "GeForce" in self.dev.device_name or "Tesla" in self.dev.device_name:
-      device_type = "NVIDIA"
-    elif "Intel" in self.dev.device_name or "HD Graphics" in self.dev.device_name or "Iris" in self.dev.device_name:
-      device_type = "Intel"
-
-    print(f"CLCompiler: Detected {device_type} GPU: {self.dev.device_name}")
-
-    # 处理架构特定的编译选项
-    if target_arch:
-      print(f"CLCompiler: Using target architecture from environment variable: {target_arch}")
-      if device_type == "AMD":
-        # 对于AMD GPU，使用-arch选项指定目标架构
-        build_options += f" -arch {target_arch}".encode()
-      elif device_type == "NVIDIA":
-        # 对于NVIDIA GPU，可以添加特定的编译选项
-        # 注意：NVIDIA OpenCL编译器可能不支持所有AMD的编译选项
-        pass
-      elif device_type == "Intel":
-        # 对于Intel GPU，可以添加特定的编译选项
-        pass
-    elif device_type == "AMD" and self.dev.device_arch:
-      # 自动检测AMD GPU架构
-      print(f"CLCompiler: Using detected AMD architecture: {self.dev.device_arch}")
-      build_options += f" -arch {self.dev.device_arch}".encode()
-    elif device_type == "AMD":
-      print(f"CLCompiler: Warning: Could not detect architecture for AMD GPU: {self.dev.device_name}")
-      print(f"CLCompiler: Compiling without specific architecture optimization")
-      print(f"CLCompiler: You can specify the correct architecture using TARGET_ARCH environment variable")
-    elif not target_arch:
-      print(f"CLCompiler: No specific architecture specified for {device_type} GPU")
-      print(f"CLCompiler: Compiling with default options")
+    if target_arch and build_options:
+      # 只在有编译选项的情况下添加架构选项
+      build_options += f" -arch {target_arch}".encode()
 
     build_status: int = cl.clBuildProgram(program, 1, self.dev.device_id, build_options, cl.clBuildProgram.argtypes[4](), None)
     if build_status != 0:
@@ -165,44 +142,25 @@ class CLDevice(Compiled):
                                            ctypes.string_at(buf, size=total.value).decode())[1]
 
     # 获取GPU架构信息
+    # 只有当用户没有显式设置时才根据设备能力自动设置
+    if os.environ.get("CL_HALF") is None and "cl_khr_fp16" not in self.device_exts:
+      os.environ["CL_HALF"] = "0"
+    if os.environ.get("CL_INT64") is None and "cl_khr_int64" not in self.device_exts and "cl_amd_int64" not in self.device_exts:
+      os.environ["CL_INT64"] = "0"
+
     self.device_arch = ""
-    if "AMD" in self.device_name or "Radeon" in self.device_name:
-      # 尝试获取AMD特定的设备信息
-      try:
-        # 对于AMD GPU，我们可以尝试获取设备的GPU代码名称
-        # 通过设备名称推断架构信息
-        if "Vega" in self.device_name:
-          self.device_arch = "gfx900"
-        elif "Renoir" in self.device_name or "Ryzen" in self.device_name:
-          # Ryzen 7 4700U集成的Renoir GPU
-          self.device_arch = "gfx90c"
-        elif "Navi 1" in self.device_name:
-          self.device_arch = "gfx1010"
-        elif "Navi 2" in self.device_name:
-          self.device_arch = "gfx1030"
-        elif "Navi 3" in self.device_name:
-          self.device_arch = "gfx1100"
-        elif "RDNA" in self.device_name:
-          # 支持RDNA架构系列
-          if "RDNA 1" in self.device_name or "RDNA1" in self.device_name:
-            self.device_arch = "gfx1010"
-          elif "RDNA 2" in self.device_name or "RDNA2" in self.device_name:
-            self.device_arch = "gfx1030"
-          elif "RDNA 3" in self.device_name or "RDNA3" in self.device_name:
-            self.device_arch = "gfx1100"
-          else:
-            self.device_arch = "gfx1010"  # 默认RDNA架构
-        else:
-          # 对于不在预定义列表中的AMD设备，默认使用gfx900（Vega）架构
-          # 用户可以通过设置TARGET_ARCH环境变量来指定正确的架构
-          self.device_arch = "gfx900"
-          if DEBUG >= 1:
-            print(f"CLDevice: unknown AMD GPU model '{self.device_name}', using default architecture {self.device_arch}")
-            print(f"CLDevice: you can override this by setting the TARGET_ARCH environment variable")
-        if DEBUG >= 1: print(f"CLDevice: extensions {self.device_exts}")
-      except Exception as e:
-        if DEBUG >= 1: print(f"CLDevice: failed to get architecture info: {e}")
-        # 发生错误时，仍然使用默认架构
+    # 简化的AMD架构检测：只在用户明确启用时使用
+    if getenv("CL_ARCH_DETECTION", "") == "1" and ("AMD" in self.device_name or "Radeon" in self.device_name):
+      # 简化的架构检测逻辑
+      if "Vega" in self.device_name:
+        self.device_arch = "gfx900"
+      elif "Renoir" in self.device_name or "Ryzen" in self.device_name:
+        self.device_arch = "gfx90c"
+      elif "Navi" in self.device_name or "RDNA" in self.device_name:
+        # 简化处理：所有Navi/RDNA架构使用gfx1010
+        self.device_arch = "gfx1010"
+      else:
+        # 默认架构
         self.device_arch = "gfx900"
 
     if DEBUG >= 1: print(f"CLDevice: opening {self.device_name} with version {self.driver_version}, arch {self.device_arch}")
@@ -215,8 +173,36 @@ class CLDevice(Compiled):
       self.driver_version.encode() +
       target_arch.encode()
     ).hexdigest()
-    compilers = [(IntelRenderer if "cl_intel_subgroup_matrix_multiply_accumulate" in self.device_exts else OpenCLRenderer,
-      functools.partial(CLCompiler, self, f"compile_cl_{cache_key}"))]
+
+    # 创建强制禁用半精度支持的自定义OpenCLRenderer子类
+    class CustomOpenCLRenderer(OpenCLRenderer):
+      def __init__(self, device_exts):
+        self.device_exts = device_exts
+        # 强制添加将half类型转换为float类型的匹配器，无论设备是否支持半精度
+        self.extra_matcher = create_non_native_float_pats((dtypes.half,)) + extra_pm
+        super().__init__()
+
+      def render_kernel(self, function_name, kernel, bufs, uops, prefix=None) -> str:
+        # 强制禁用半精度扩展，不添加任何半精度支持
+        # 即使设备支持半精度，也强制使用单精度
+        return super().render_kernel(function_name, kernel, bufs, uops, prefix)
+
+    # 创建强制禁用半精度支持的自定义IntelRenderer子类
+    class CustomIntelRenderer(IntelRenderer):
+      def __init__(self, device_exts):
+        self.device_exts = device_exts
+        # 强制添加将half类型转换为float类型的匹配器，无论设备是否支持半精度
+        self.extra_matcher = create_non_native_float_pats((dtypes.half,)) + extra_pm
+        super().__init__()
+
+      def render_kernel(self, function_name, kernel, bufs, uops, prefix=None) -> str:
+        # 强制禁用半精度扩展，不添加任何半精度支持
+        # 即使设备支持半精度，也强制使用单精度
+        return super().render_kernel(function_name, kernel, bufs, uops, prefix)
+
+    # 使用自定义渲染器
+    renderer_class = CustomIntelRenderer if "cl_intel_subgroup_matrix_multiply_accumulate" in self.device_exts else CustomOpenCLRenderer
+    compilers = [(functools.partial(renderer_class, self.device_exts), functools.partial(CLCompiler, self, f"compile_cl_{cache_key}"))]
     super().__init__(device, CLAllocator(self), compilers, functools.partial(CLProgram, self))
   def synchronize(self):
     check(cl.clFinish(self.queue))
