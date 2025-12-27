@@ -277,6 +277,11 @@ class OpenCLRenderer(CStyleLanguage):
   type_map = { dtypes.int8: "char", dtypes.uint8: "uchar", dtypes.uint32: "uint", dtypes.uint16: "ushort", dtypes.uint64: "ulong",
               dtypes.bfloat16: "ushort" }
 
+  def __init__(self):
+    # Override half type mapping when CL_HALF=0
+    if getenv("CL_HALF", 1) == "0":
+      self.type_map[dtypes.half] = "float"
+
   string_rewrite = PatternMatcher([
     (UPat(Ops.BITCAST, name="x"), lambda ctx,x: f"as_{ctx.render_dtype(x.dtype)}({ctx[x.src[0]]})"),
     # load/store image (OpenCL)
