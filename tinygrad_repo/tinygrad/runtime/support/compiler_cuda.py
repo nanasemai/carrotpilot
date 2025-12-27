@@ -78,7 +78,12 @@ class PTXCompiler(Compiler):
     self.arch = arch
     super().__init__(f"compile_{cache_key}_{self.arch}")
   def compile(self, src:str) -> bytes:
-    return src.replace("TARGET", self.arch).replace("VERSION", "8.7" if (ver:=int(self.arch[3:]))>=120 else ("7.8" if ver>=89 else "7.5")).encode()
+    # Allow overriding PTX version via environment variable for compatibility with older drivers
+    ptx_version = getenv("PTX_VERSION")
+    if not ptx_version:
+      ver = int(self.arch[3:])
+      ptx_version = "8.7" if ver >= 120 else ("7.8" if ver >= 89 else "7.5")
+    return src.replace("TARGET", self.arch).replace("VERSION", ptx_version).encode()
   def disassemble(self, lib:bytes): cuda_disassemble(lib, self.arch)
 
 class NVPTXCompiler(PTXCompiler):
