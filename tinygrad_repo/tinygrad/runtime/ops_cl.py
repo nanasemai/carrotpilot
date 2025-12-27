@@ -21,26 +21,47 @@ class CLCompiler(Compiler):
   def compile(self, src:str) -> bytes:
     program = checked(cl.clCreateProgramWithSource(self.dev.context, 1, to_char_p_p([src.encode()]), None, status := ctypes.c_int32()), status)
 
-    # 设置编译选项以支持多个AMD GPU架构
-    build_options = "-cl-std=CL2.0 -cl-mad-enable -cl-fast-relaxed-math -cl-unsafe-math-optimizations -fno-code-embed".encode()
+    # 设置基础编译选项
+    build_options = "-cl-std=CL1.2 -cl-mad-enable -cl-fast-relaxed-math -cl-unsafe-math-optimizations".encode()
 
     # 从环境变量获取目标架构信息
     target_arch = os.environ.get("TARGET_ARCH")
+    device_type = "Unknown"
+
+    # 识别设备类型
+    if "AMD" in self.dev.device_name or "Radeon" in self.dev.device_name:
+      device_type = "AMD"
+    elif "NVIDIA" in self.dev.device_name or "GeForce" in self.dev.device_name or "Tesla" in self.dev.device_name:
+      device_type = "NVIDIA"
+    elif "Intel" in self.dev.device_name or "HD Graphics" in self.dev.device_name or "Iris" in self.dev.device_name:
+      device_type = "Intel"
+
+    print(f"CLCompiler: Detected {device_type} GPU: {self.dev.device_name}")
+
+    # 处理架构特定的编译选项
     if target_arch:
       print(f"CLCompiler: Using target architecture from environment variable: {target_arch}")
-      # 为特定架构添加编译选项
-      if "AMD" in self.dev.device_name or "Radeon" in self.dev.device_name:
+      if device_type == "AMD":
         # 对于AMD GPU，使用-arch选项指定目标架构
         build_options += f" -arch {target_arch}".encode()
-    elif "AMD" in self.dev.device_name or "Radeon" in self.dev.device_name:
+      elif device_type == "NVIDIA":
+        # 对于NVIDIA GPU，可以添加特定的编译选项
+        # 注意：NVIDIA OpenCL编译器可能不支持所有AMD的编译选项
+        pass
+      elif device_type == "Intel":
+        # 对于Intel GPU，可以添加特定的编译选项
+        pass
+    elif device_type == "AMD" and self.dev.device_arch:
       # 自动检测AMD GPU架构
-      if self.dev.device_arch:
-        print(f"CLCompiler: Detected AMD GPU: {self.dev.device_name}, using architecture: {self.dev.device_arch}")
-        build_options += f" -arch {self.dev.device_arch}".encode()
-      else:
-        print(f"CLCompiler: Warning: Could not detect architecture for AMD GPU: {self.dev.device_name}")
-        print(f"CLCompiler: Compiling without specific architecture optimization")
-        print(f"CLCompiler: You can specify the correct architecture using TARGET_ARCH environment variable")
+      print(f"CLCompiler: Using detected AMD architecture: {self.dev.device_arch}")
+      build_options += f" -arch {self.dev.device_arch}".encode()
+    elif device_type == "AMD":
+      print(f"CLCompiler: Warning: Could not detect architecture for AMD GPU: {self.dev.device_name}")
+      print(f"CLCompiler: Compiling without specific architecture optimization")
+      print(f"CLCompiler: You can specify the correct architecture using TARGET_ARCH environment variable")
+    elif not target_arch:
+      print(f"CLCompiler: No specific architecture specified for {device_type} GPU")
+      print(f"CLCompiler: Compiling with default options")
 
     build_status: int = cl.clBuildProgram(program, 1, self.dev.device_id, build_options, cl.clBuildProgram.argtypes[4](), None)
     if build_status != 0:
