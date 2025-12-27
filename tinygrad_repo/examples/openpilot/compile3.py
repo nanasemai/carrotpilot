@@ -20,20 +20,6 @@ def compile(onnx_file):
   # Float inputs and outputs to tinyjits for openpilot are always float32
   # TODO this seems dumb
   input_types = {k:(dtypes.float32 if v is dtypes.float16 else v) for k,v in input_types.items()}
-  
-  # Force all half types to float32 when CL_HALF=0
-  from tinygrad.helpers import getenv
-  if getenv("CL_HALF", 1) == "0":
-    # Convert all half types in graph values to float32
-    for name, value in run_onnx.graph_values.items():
-      if value.dtype == dtypes.half:
-        run_onnx.graph_values[name] = value.cast(dtypes.float32)
-    # Convert all half types in graph nodes to float32
-    for node in run_onnx.graph_nodes:
-      for key, value in node.opts.items():
-        if hasattr(value, 'dtype') and value.dtype == dtypes.half:
-          node.opts[key] = value.cast(dtypes.float32)
-  
   Tensor.manual_seed(100)
   inputs = {k:Tensor(Tensor.randn(*shp, dtype=input_types[k]).mul(8).realize().numpy(), device='NPY') for k,shp in sorted(input_shapes.items())}
   if not getenv("NPY_IMG"):
@@ -111,7 +97,7 @@ def test_vs_compile(run, inputs, test_val=None):
 def test_vs_onnx(new_inputs, test_val, onnx_file, tol):
   import onnx
   import onnxruntime as ort
-  
+
   onnx_inputs = {k:v.numpy() for k,v in new_inputs.items()}
   onnx_model = onnx.load(onnx_file)
 

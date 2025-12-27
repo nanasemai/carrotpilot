@@ -277,11 +277,6 @@ class OpenCLRenderer(CStyleLanguage):
   type_map = { dtypes.int8: "char", dtypes.uint8: "uchar", dtypes.uint32: "uint", dtypes.uint16: "ushort", dtypes.uint64: "ulong",
               dtypes.bfloat16: "ushort" }
 
-  def __init__(self):
-    # Override half type mapping when CL_HALF=0
-    if getenv("CL_HALF", 1) == "0":
-      self.type_map[dtypes.half] = "float"
-
   string_rewrite = PatternMatcher([
     (UPat(Ops.BITCAST, name="x"), lambda ctx,x: f"as_{ctx.render_dtype(x.dtype)}({ctx[x.src[0]]})"),
     # load/store image (OpenCL)
@@ -295,8 +290,7 @@ class OpenCLRenderer(CStyleLanguage):
   ]) + base_rewrite
 
   def render_kernel(self, function_name, kernel, bufs, uops, prefix=None) -> str:
-    if any(uop.dtype.base == dtypes.half for uop in uops) and getenv("CL_HALF", 1) != "0":
-      prefix = (["#pragma OPENCL EXTENSION cl_khr_fp16 : enable"] + (prefix or []))
+    if any(uop.dtype.base == dtypes.half for uop in uops): prefix = (["#pragma OPENCL EXTENSION cl_khr_fp16 : enable"] + (prefix or []))
     return super().render_kernel(function_name, kernel, bufs, uops, prefix)
 
 class IntelRenderer(OpenCLRenderer):
