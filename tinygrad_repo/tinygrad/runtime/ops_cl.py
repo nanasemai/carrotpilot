@@ -216,8 +216,8 @@ class CLDevice(Compiled):
 
             self.string_rewrite += PatternMatcher([
                 # 必须优先处理 INDEX 和 STORE
-                (UPat(Ops.INDEX, src=(UPat(Ops.DEFINE_GLOBAL, name="buf"), UPat.var("idx"))), index_int64_fix),
-                (UPat(Ops.STORE, src=(UPat.var("bidx"), UPat.var("val"))), store_int64_fix),
+                (UPat(Ops.INDEX, src=(UPat.var("buf"), UPat.var("idx")), allow_any_len=True), index_int64_fix),
+                (UPat(Ops.STORE, src=(UPat.var("bidx"), UPat.var("val")), allow_any_len=True), store_int64_fix),
 
                 (UPat(Ops.CONST, dtype=dtypes.int64, name="x"), lambda ctx,x: str(int(x.arg))),
                 (UPat(Ops.CONST, dtype=dtypes.uint64, name="x"), lambda ctx,x: f"{int(x.arg)}u"),
