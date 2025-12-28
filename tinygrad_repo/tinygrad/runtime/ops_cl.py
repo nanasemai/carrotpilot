@@ -2,6 +2,7 @@ from __future__ import annotations
 from typing import cast
 import ctypes, functools, hashlib, os
 from tinygrad.runtime.autogen import opencl as cl
+from tinygrad.uop.ops import Ops, PatternMatcher, UPat
 from tinygrad.helpers import init_c_var, to_char_p_p, from_mv, OSX, DEBUG, mv_address, suppress_finalizing, getenv
 from tinygrad.renderer.cstyle import OpenCLRenderer, IntelRenderer, CStyleLanguage, create_non_native_float_pats, extra_pm
 from tinygrad.device import BufferSpec, LRUAllocator, Compiled, Compiler, CompileError
@@ -175,17 +176,34 @@ class CLDevice(Compiled):
     ).hexdigest()
 
     # 创建强制禁用半精度支持的自定义OpenCLRenderer子类
+    # 创建强制禁用半精度支持的自定义OpenCLRenderer子类
     class CustomOpenCLRenderer(OpenCLRenderer):
       def __init__(self, device_exts):
         self.device_exts = device_exts
         # 强制添加将half类型转换为float类型的匹配器，无论设备是否支持半精度
         self.extra_matcher = create_non_native_float_pats((dtypes.half,)) + extra_pm
+
+        # 将half映射为short，以避免声明half类型的变量
+        self.type_map = OpenCLRenderer.type_map.copy()
+        self.type_map[dtypes.half] = "short"
+
+        # 自定义CAST重写，通过辅助函数进行转换
+        self.string_rewrite = PatternMatcher([
+            (UPat(Ops.CAST, dtype=dtypes.float, src=(UPat(dtype=dtypes.half, name="x"),)),
+             lambda ctx,x: f"half_to_float({ctx[x]})"),
+            (UPat(Ops.CAST, dtype=dtypes.half, src=(UPat(dtype=dtypes.float, name="x"),)),
+             lambda ctx,x: f"float_to_half({ctx[x]})"),
+        ]) + OpenCLRenderer.string_rewrite
+
         super().__init__()
 
       def render_kernel(self, function_name, kernel, bufs, uops, prefix=None) -> str:
-        # 强制禁用半精度扩展，不添加任何半精度支持
-        # 即使设备支持半精度，也强制使用单精度
-        # 直接调用父类的父类（CStyleLanguage）的render_kernel方法，跳过OpenCLRenderer的扩展添加逻辑
+        # 强制禁用半精度扩展，添加辅助函数
+        helpers = [
+            "float half_to_float(short x) { return vload_half(0, (private const half*)&x); }",
+            "short float_to_half(float x) { short r; vstore_half(x, 0, (private half*)&r); return r; }"
+        ]
+        prefix = (prefix or []) + helpers
         return CStyleLanguage.render_kernel(self, function_name, kernel, bufs, uops, prefix)
 
     # 创建强制禁用半精度支持的自定义IntelRenderer子类
