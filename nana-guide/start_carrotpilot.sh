@@ -35,7 +35,5 @@ mkdir -p "/tmp/openpilot"
 
 # 启动项目
 echo "[INFO] 执行启动脚本..."
-
-./launch_chffrplus.sh
-
+gnome-terminal --title="Carrotpilot Logs" -- bash -c "cd '$PROJECT_ROOT'; echo '正在启动Carrotpilot...'; ./launch_chffrplus.sh; echo 'Carrotpilot已退出，按任意键关闭窗口...'; read -n1"
 exit $?
