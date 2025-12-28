@@ -8,6 +8,7 @@ import uuid
 import socket
 import logging
 import traceback
+import re
 import numpy as np
 from threading import local
 from collections import OrderedDict
@@ -47,7 +48,8 @@ class SwagFormatter(logging.Formatter):
       except (ValueError, TypeError):
         record_dict['msg'] = [record.msg]+record.args
 
-    record_dict['ctx'] = self.swaglogger.get_ctx()
+    # 当swaglogger为None时使用空字典
+    record_dict['ctx'] = self.swaglogger.get_ctx() if self.swaglogger else {}
 
     if record.exc_info:
       record_dict['exc_info'] = self.formatException(record.exc_info)
@@ -69,8 +71,6 @@ class SwagFormatter(logging.Formatter):
     return record_dict
 
   def format(self, record):
-    if self.swaglogger is None:
-      raise Exception("must set swaglogger before calling format()")
     return json_robust_dumps(self.format_dict(record))
 
 class SwagLogFileFormatter(SwagFormatter):
@@ -110,6 +110,55 @@ class SwagLogFileFormatter(SwagFormatter):
     v['id'] = uuid.uuid4().hex
 
     return json_robust_dumps(v)
+
+
+class HumanReadableFormatter(logging.Formatter):
+  """
+  可读性更好的日志格式化器，借鉴nana-guide/log_new_version的格式
+  格式: 时间戳 | 级别 | 模块 | 消息
+  """
+
+  def format(self, record):
+    try:
+      # 处理LogRecord对象
+      if isinstance(record.msg, dict):
+        msg_dict = record.msg
+        # 确保消息内容始终是字符串类型
+        msg_content = str(msg_dict.get('msg', str(msg_dict)))
+        # 优先从字典获取模块名，其次从record属性获取
+        module = msg_dict.get('module', record.module if hasattr(record, 'module') else 'unknown')
+      else:
+        msg_content = str(record.msg)
+        module = record.module if hasattr(record, 'module') else 'unknown'
+
+      # 优化时间戳生成 - 减少重复计算
+      current_time = time.time()
+      timestamp_parts = time.localtime(current_time)
+      microsecond = int(current_time * 1000) % 1000
+      timestamp = f"{time.strftime('%Y-%m-%d %H:%M:%S', timestamp_parts)}.{microsecond:03d}"
+
+      level_name = logging.getLevelName(record.levelno)
+
+      # 去除 ANSI 颜色代码
+      msg_content = re.sub(r'\x1b\[[0-9;]*m', '', msg_content)
+
+      return f"{timestamp} | {level_name:<7} | {module:<15} | {msg_content}"
+    except Exception as e:
+      # 更简洁的错误处理
+      return f"FormatError: {type(e).__name__}: {str(e)[:80]}"
+
+
+class AnsiColorStripFormatter(logging.Formatter):
+  """去除ANSI颜色代码的格式化器包装器"""
+
+  def __init__(self, original_formatter):
+    super().__init__()
+    self.original_formatter = original_formatter
+
+  def format(self, record):
+    formatted = self.original_formatter.format(record)
+    # 去除ANSI颜色代码
+    return re.sub(r'\x1b\[[0-9;]*m', '', formatted)
 
 class SwagErrorFilter(logging.Filter):
   def filter(self, record):

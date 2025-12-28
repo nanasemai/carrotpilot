@@ -32,13 +32,10 @@ def get_default_params():
     ("OpenpilotEnabledToggle", "1"),
     ("LongitudinalPersonality", str(log.LongitudinalPersonality.standard)),
     ("IsMetric", "1"),
-    ("RecordAudio", "1"),
-
+    ("RecordAudio", "0"),
     ("SearchInput", "0"),
     ("GMapKey", "0"),
     ("MapboxStyle", "0"),
-
-
     ("LongitudinalPersonalityMax", "3"),
     ("ShowDebugUI", "0"),
     ("ShowTpms", "1"),
@@ -65,18 +62,15 @@ def get_default_params():
     ("AutoEngage", "0"),
     ("DisableMinSteerSpeed", "0"),
     ("SoftHoldMode", "0"),
-
     ("AutoSpeedUptoRoadSpeedLimit", "0"),
     ("AutoRoadSpeedAdjust", "50"),
     ("AutoCurveSpeedLowerLimit", "30"),
     ("AutoCurveSpeedFactor", "120"),
     ("AutoCurveSpeedAggressiveness", "100"),
-
     ("AutoTurnControl", "0"),
     ("AutoTurnControlSpeedTurn", "20"),
     ("AutoTurnControlTurnEnd", "6"),
     ("AutoTurnMapChange", "0"),
-
     ("AutoNaviSpeedCtrlEnd", "7"),
     ("AutoNaviSpeedCtrlMode", "2"),
     ("AutoNaviSpeedBumpTime", "1"),
@@ -170,7 +164,7 @@ def get_default_params():
     ("SteerActuatorDelay", "0"),
     ("LatSmoothSec", "13"),
     ("MaxTimeOffroadMin", "60"),
-    ("DisableDM", "0"),
+    ("DisableDM", "1"),
     ("EnableConnect", "0"),
     ("MuteDoor", "0"),
     ("MuteSeatbelt", "0"),
@@ -183,6 +177,7 @@ def get_default_params():
     ("SteerRatioRate", "100"),
     ("NNFF", "0"),
     ("NNFFLite", "0"),
+    ("HardwareC3xLite", "1"),
   ]
   return default_params
 

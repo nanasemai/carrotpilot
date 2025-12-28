@@ -4,6 +4,54 @@ DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null && pwd )"
 
 source "$DIR/launch_env.sh"
 
+# Load environment variables from .env file if it exists
+if [ -f "$DIR/.env" ]; then
+  source "$DIR/.env"
+else
+  # Set default environment variables if .env file doesn't exist
+  echo "No .env file found, setting default environment variables..."
+  # Users can manually add GPU support in .env file
+  # export DEV=AMD  # Use AMD GPU for model inference
+  # export DEV=NVIDIA  # Use NVIDIA GPU for model inference
+  export ZMQ=1         # Enable ZMQ for IPC
+  export USE_WEBCAM=1  # Enable webcam support
+  export ROAD_CAM=0    # Default road camera setting
+  # Disable other cameras
+  export DRIVER_CAM=""  # Disable driver camera
+  export WIDE_CAM=""    # Disable wide camera
+  export PYTHONPATH="$PWD"  # Set Python path
+  export LOG_READABLE="1"   # Enable human-readable log format
+fi
+
+# PC environment detection and configuration
+if [ ! -f /TICI ]; then
+  echo "Detected PC environment, applying PC-specific configuration..."
+
+  # Create necessary directories if they don't exist
+  # Set default PARAMS_ROOT if not already set
+  if [ -z "$PARAMS_ROOT" ]; then
+    PARAMS_ROOT="$PWD/data/params"
+  fi
+  mkdir -p $PARAMS_ROOT/d /tmp/openpilot
+
+  # Set default language if not already set
+  if [ ! -f $PARAMS_ROOT/d/LanguageSetting ]; then
+    echo -n "main_en" > $PARAMS_ROOT/d/LanguageSetting
+  fi
+
+  # Set HardwareC3xLite to 1 by default (forced)
+  echo "1" > $PARAMS_ROOT/d/HardwareC3xLite
+
+  # Set DisableDM to 1 by default (forced)
+  echo "1" > $PARAMS_ROOT/d/DisableDM
+
+  # Set default SWAGLOG_ROOT if not already set
+  if [ -z "$SWAGLOG_ROOT" ]; then
+    SWAGLOG_ROOT="$PWD/data/log"
+  fi
+  mkdir -p $SWAGLOG_ROOT
+fi
+
 function agnos_init {
   # TODO: move this to agnos
   sudo rm -f /data/etc/NetworkManager/system-connections/*.nmmeta
@@ -66,60 +114,79 @@ function launch {
   fi
 
   # handle pythonpath
-  ln -sfn $(pwd) /data/pythonpath
-  export PYTHONPATH="$PWD"
+  if [ -w /data ]; then
+    ln -sfn $(pwd) /data/pythonpath
+  fi
+  # Only set PYTHONPATH if not already set from .env
+  if [ -z "$PYTHONPATH" ]; then
+    export PYTHONPATH="$PWD"
+  fi
 
   # hardware specific init
   if [ -f /AGNOS ]; then
     agnos_init
   fi
 
-  # write tmux scrollback to a file
-  tmux capture-pane -pq -S-1500 > /tmp/launch_log
-  if python -c "import flask" > /dev/null 2>&1; then
-    echo "Flask already installed."
+  # write tmux scrollback to a file if tmux is available
+  if command -v tmux &> /dev/null && [ -n "$TMUX" ]; then
+    tmux capture-pane -pq -S-1500 > /tmp/launch_log
   else
-    echo "Flask installing."
-    pip install flask
+    echo "Tmux not available, skipping scrollback capture"
   fi
-  if python -c "import shapely" > /dev/null 2>&1; then
-    echo "shapely already installed."
-  else
-    echo "shapely installing."
-    pip install shapely
+  # Install/Update dependencies using uv sync
+  if ! command -v "uv" > /dev/null 2>&1; then
+    echo "installing uv..."
+    curl -LsSf https://astral.sh/uv/install.sh | sh
+    UV_BIN="$HOME/.local/bin"
+    PATH="$UV_BIN:$PATH"
   fi
-  if python -c "import kaitaistruct" > /dev/null 2>&1; then
-    echo "kaitaistruct already installed."
-  else
-    echo "kaitaistruct installing."
-    pip install kaitaistruct
+
+  echo "updating dependencies with uv sync..."
+  uv sync --frozen --all-extras
+
+  # Activate virtual environment if it exists
+  if [ -f ".venv/bin/activate" ]; then
+    source .venv/bin/activate
   fi
 
   # events language init
-  #LANG=$(cat ${PARAMS_ROOT}/d/LanguageSetting)
-  LANG=$(cat /data/params/d/LanguageSetting)
+  # Set default PARAMS_ROOT if not already set
+  if [ -z "$PARAMS_ROOT" ]; then
+    PARAMS_ROOT="$PWD/data/params"
+  fi
+  LANG=$(cat $PARAMS_ROOT/d/LanguageSetting)
   EVENTSTAT=$(git status)
 
   # events.py 한글로 변경 및 파일이 교체된 상태인지 확인
-  if [ "${LANG}" = "main_ko" ] && [[ ! "${EVENTSTAT}" == *"modified:   selfdrive/controls/lib/events.py"* ]]; then
-    cp -f $DIR/selfdrive/selfdrived/events.py $DIR/scripts/add/events_en.py
+  if [ "${LANG}" = "main_ko" ] && [[ ! "${EVENTSTAT}" == *"modified:   selfdrive/selfdrived/events.py"* ]]; then
+    # Backup English version only if it doesn't exist yet
+    if [ ! -f "$DIR/scripts/add/events_en.py" ]; then
+      cp -f $DIR/selfdrive/selfdrived/events.py $DIR/scripts/add/events_en.py
+    fi
     cp -f $DIR/scripts/add/events_ko.py $DIR/selfdrive/selfdrived/events.py
-  elif [ "${LANG}" = "main_zh-CHS" ] && [[ ! "${EVENTSTAT}" == *"modified:   selfdrive/controls/lib/events.py"* ]]; then
-    # Backup current events.py (assumed English) and install Simplified Chinese events
-    cp -f $DIR/selfdrive/selfdrived/events.py $DIR/scripts/add/events_en.py
+  elif [ "${LANG}" = "main_zh-CHS" ] && [[ ! "${EVENTSTAT}" == *"modified:   selfdrive/selfdrived/events.py"* ]]; then
+    # Backup English version only if it doesn't exist yet
+    if [ ! -f "$DIR/scripts/add/events_en.py" ]; then
+      cp -f $DIR/selfdrive/selfdrived/events.py $DIR/scripts/add/events_en.py
+    fi
     cp -f $DIR/scripts/add/events_zh.py $DIR/selfdrive/selfdrived/events.py
-  elif [ "${LANG}" = "main_en" ] && [[ "${EVENTSTAT}" == *"modified:   selfdrive/controls/lib/events.py"* ]]; then
-    cp -f $DIR/scripts/add/events_en.py $DIR/selfdrive/selfdrived/events.py
+  elif [ "${LANG}" = "main_en" ] && [[ "${EVENTSTAT}" == *"modified:   selfdrive/selfdrived/events.py"* ]]; then
+    # Only restore English if backup exists
+    if [ -f "$DIR/scripts/add/events_en.py" ]; then
+      cp -f $DIR/scripts/add/events_en.py $DIR/selfdrive/selfdrived/events.py
+    fi
   fi
 
-  # c3xl amplifier file change
-  C3XL=$(cat /data/params/d/HardwareC3xLite)
+  # c3xl amplifier file change - only execute on TICI hardware
+  if [ -f /TICI ]; then
+    C3XL=$(cat $PARAMS_ROOT/d/HardwareC3xLite)
 
-  if [ "${C3XL}" = "1" ] && [[ ! "${EVENTSTAT}" == *"modified:   system/hardware/tici/amplifier.py"* ]]; then
-    cp -f $DIR/system/hardware/tici/amplifier.py $DIR/scripts/add/amplifier_org.py
-    cp -f $DIR/scripts/add/amplifier_c3xl.py $DIR/system/hardware/tici/amplifier.py
-  elif [ "${C3XL}" = "0" ] && [[ "${EVENTSTAT}" == *"modified:   system/hardware/tici/amplifier.py"* ]]; then
-    cp -f $DIR/scripts/add/amplifier_org.py $DIR/system/hardware/tici/amplifier.py
+    if [ "${C3XL}" = "1" ] && [[ ! "${EVENTSTAT}" == *"modified:   system/hardware/tici/amplifier.py"* ]]; then
+      cp -f $DIR/system/hardware/tici/amplifier.py $DIR/scripts/add/amplifier_org.py
+      cp -f $DIR/scripts/add/amplifier_c3xl.py $DIR/system/hardware/tici/amplifier.py
+    elif [ "${C3XL}" = "0" ] && [[ "${EVENTSTAT}" == *"modified:   system/hardware/tici/amplifier.py"* ]]; then
+      cp -f $DIR/scripts/add/amplifier_org.py $DIR/system/hardware/tici/amplifier.py
+    fi
   fi
 
   # start manager
