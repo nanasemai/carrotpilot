@@ -200,18 +200,17 @@ class CLDevice(Compiled):
             self.type_map[dtypes.uint64] = "uint"
 
             def index_int64_fix(ctx, buf, idx):
-                # 如果buffer是int64/uint64，但被当做int32指针，索引需要乘2
-                if buf.dtype.base in (dtypes.int64, dtypes.uint64):
+                # 如果buffer是int64/uint64 (itemsize=8)，但被当做int32指针，索引需要乘2
+                if buf.dtype.itemsize == 8:
+                     # print(f"DEBUG: index_int64_fix applied on {ctx[buf]} {ctx[idx]}")
                      return f"({ctx[buf]}+({ctx[idx]})*2)"
                 return None
 
             def store_int64_fix(ctx, bidx, val):
                 # 模拟64位存储：低32位存值，高32位存0（或符号位）
-                # 注意：这里假设系统是小端序（Little Endian）
-                if val.dtype == dtypes.int64:
-                    return f"{{ *{ctx[bidx]} = {ctx[val]}; *({ctx[bidx]}+1) = ({ctx[val]} >> 31); }}"
-                if val.dtype == dtypes.uint64:
-                    return f"{{ *{ctx[bidx]} = {ctx[val]}; *({ctx[bidx]}+1) = 0; }}"
+                if val.dtype.itemsize == 8:
+                    high_part = "0" if dtypes.is_unsigned(val.dtype) else f"({ctx[val]} >> 31)"
+                    return f"{{ *{ctx[bidx]} = {ctx[val]}; *({ctx[bidx]}+1) = {high_part}; }}"
                 return None
 
             self.string_rewrite += PatternMatcher([
