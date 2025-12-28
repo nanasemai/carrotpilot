@@ -3,7 +3,7 @@ from typing import cast
 import ctypes, functools, hashlib, os
 from tinygrad.runtime.autogen import opencl as cl
 from tinygrad.helpers import init_c_var, to_char_p_p, from_mv, OSX, DEBUG, mv_address, suppress_finalizing, getenv
-from tinygrad.renderer.cstyle import OpenCLRenderer, IntelRenderer, create_non_native_float_pats, extra_pm
+from tinygrad.renderer.cstyle import OpenCLRenderer, IntelRenderer, CStyleLanguage, create_non_native_float_pats, extra_pm
 from tinygrad.device import BufferSpec, LRUAllocator, Compiled, Compiler, CompileError
 from tinygrad.dtype import dtypes
 
@@ -185,7 +185,8 @@ class CLDevice(Compiled):
       def render_kernel(self, function_name, kernel, bufs, uops, prefix=None) -> str:
         # 强制禁用半精度扩展，不添加任何半精度支持
         # 即使设备支持半精度，也强制使用单精度
-        return super().render_kernel(function_name, kernel, bufs, uops, prefix)
+        # 直接调用父类的父类（CStyleLanguage）的render_kernel方法，跳过OpenCLRenderer的扩展添加逻辑
+        return CStyleLanguage.render_kernel(self, function_name, kernel, bufs, uops, prefix)
 
     # 创建强制禁用半精度支持的自定义IntelRenderer子类
     class CustomIntelRenderer(IntelRenderer):
@@ -198,7 +199,8 @@ class CLDevice(Compiled):
       def render_kernel(self, function_name, kernel, bufs, uops, prefix=None) -> str:
         # 强制禁用半精度扩展，不添加任何半精度支持
         # 即使设备支持半精度，也强制使用单精度
-        return super().render_kernel(function_name, kernel, bufs, uops, prefix)
+        # 直接调用父类的父类（CStyleLanguage）的render_kernel方法，跳过OpenCLRenderer的扩展添加逻辑
+        return CStyleLanguage.render_kernel(self, function_name, kernel, bufs, uops, prefix)
 
     # 使用自定义渲染器
     renderer_class = CustomIntelRenderer if "cl_intel_subgroup_matrix_multiply_accumulate" in self.device_exts else CustomOpenCLRenderer

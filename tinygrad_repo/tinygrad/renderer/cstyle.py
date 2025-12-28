@@ -304,11 +304,14 @@ class IntelRenderer(OpenCLRenderer):
   ]) + OpenCLRenderer.string_rewrite
 
   def render_kernel(self, function_name, kernel, bufs, uops, prefix=None) -> str:
-    prefix = []
-    for name, _, dtype_in, dtype_out, _, _, _, _ in wmma_args(uops):
-      dt_in = ("ushort", "bf16") if dtype_in == dtypes.bfloat16 else (dtype_in.name, "f16")
-      prefix.append(f"""{dtype_out.name}8 __{name}({dt_in[0]}16 a, {dt_in[0]}16 b, {dtype_out.name}8 c) {{
-    return intel_sub_group_{dt_in[1]}_{dt_in[1]}_matrix_mad_k16(as_int8(a), as_int8(b), c);\n}}""")
+    use_half = getenv("CL_HALF", 1) != "0"
+    # Only generate tensor core code if half is enabled and we're using half precision
+    if use_half and any(uop.dtype.base == dtypes.half for uop in uops):
+      prefix = []
+      for name, _, dtype_in, dtype_out, _, _, _, _ in wmma_args(uops):
+        dt_in = ("ushort", "bf16") if dtype_in == dtypes.bfloat16 else (dtype_in.name, "f16")
+        prefix.append(f"""{dtype_out.name}8 __{name}({dt_in[0]}16 a, {dt_in[0]}16 b, {dtype_out.name}8 c) {{
+  return intel_sub_group_{dt_in[1]}_{dt_in[1]}_matrix_mad_k16(as_int8(a), as_int8(b), c);\n}}""")
     return super().render_kernel(function_name, kernel, bufs, uops, prefix or None)
 
 class MetalRenderer(CStyleLanguage):
