@@ -198,7 +198,27 @@ class CLDevice(Compiled):
             self.type_map = self.type_map.copy()
             self.type_map[dtypes.int64] = "int"
             self.type_map[dtypes.uint64] = "uint"
+
+            def index_int64_fix(ctx, buf, idx):
+                # 如果buffer是int64/uint64，但被当做int32指针，索引需要乘2
+                if buf.dtype.base in (dtypes.int64, dtypes.uint64):
+                     return f"({ctx[buf]}+({ctx[idx]})*2)"
+                return None
+
+            def store_int64_fix(ctx, bidx, val):
+                # 模拟64位存储：低32位存值，高32位存0（或符号位）
+                # 注意：这里假设系统是小端序（Little Endian）
+                if val.dtype == dtypes.int64:
+                    return f"{{ *{ctx[bidx]} = {ctx[val]}; *({ctx[bidx]}+1) = ({ctx[val]} >> 31); }}"
+                if val.dtype == dtypes.uint64:
+                    return f"{{ *{ctx[bidx]} = {ctx[val]}; *({ctx[bidx]}+1) = 0; }}"
+                return None
+
             self.string_rewrite += PatternMatcher([
+                # 必须优先处理 INDEX 和 STORE
+                (UPat(Ops.INDEX, src=(UPat(Ops.DEFINE_GLOBAL, name="buf"), UPat.var("idx"))), index_int64_fix),
+                (UPat(Ops.STORE, src=(UPat.var("bidx"), UPat.var("val"))), store_int64_fix),
+
                 (UPat(Ops.CONST, dtype=dtypes.int64, name="x"), lambda ctx,x: str(int(x.arg))),
                 (UPat(Ops.CONST, dtype=dtypes.uint64, name="x"), lambda ctx,x: f"{int(x.arg)}u"),
             ])
