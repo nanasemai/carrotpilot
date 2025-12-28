@@ -109,7 +109,8 @@ int FfmpegEncoder::encode_frame(VisionBuf* buf, VisionIpcBufExtra *extra) {
     frame->data[1] = cu;
     frame->data[2] = cv;
   }
-  frame->pts = counter*50*1000; // 50ms per frame
+  // 使用基于frame_id的时间戳，确保PTS严格单调递增
+  frame->pts = extra->frame_id * (1000000LL / encoder_info.fps); // 转换为微秒
 
   int ret = counter;
 

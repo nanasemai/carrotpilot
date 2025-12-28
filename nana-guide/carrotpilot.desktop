@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=Carrotpilot
+Comment=Carrotpilot Autonomous Driving Project
+Exec=/bin/bash -c "cd /home/ubuntu/carrotpilot && bash /home/ubuntu/carrotpilot/nana-guide/start_carrotpilot.sh"
+Icon=utilities-terminal
+Terminal=true
+Categories=Development;
+StartupNotify=false
+X-GNOME-Autostart-Delay=10

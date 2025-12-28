@@ -790,6 +790,15 @@ def backoff(retries: int) -> int:
 
 
 def main(exit_event: threading.Event = None):
+  # 检查是否为PC版本，如果是则禁用athenad服务
+  if PC:
+    cloudlog.info("Athenad service disabled in PC version")
+    # 如果提供了exit_event，等待退出信号
+    if exit_event is not None:
+      while not exit_event.is_set():
+        time.sleep(1)
+    return
+  
   try:
     set_core_affinity([0, 1, 2, 3])
   except Exception:

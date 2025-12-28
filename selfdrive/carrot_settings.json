@@ -973,7 +973,7 @@
       "edescr": "Reboot required",
       "min": 0,
       "max": 1,
-      "default": 0,
+      "default": 1,
       "unit": 1
     },
     {
@@ -1378,6 +1378,19 @@
       "min": 0,
       "max": 1,
       "default": 0,
+      "unit": 1
+    },
+    {
+      "group": "시작",
+      "name": "HardwareC3xLite",
+      "title": "Hardware is C3x Lite",
+      "descr": "Hardware C3x Lite mode",
+      "egroup": "START",
+      "etitle": "Hardware is C3x Lite",
+      "edescr": "Hardware C3x Lite mode",
+      "min": 0,
+      "max": 1,
+      "default": 1,
       "unit": 1
     },
     {

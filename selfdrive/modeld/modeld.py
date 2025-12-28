@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 import os
 from openpilot.system.hardware import TICI
-os.environ['DEV'] = 'QCOM' if TICI else 'LLVM'
+os.environ['DEV'] = 'QCOM' if TICI else 'CL'
 USBGPU = "USBGPU" in os.environ
 if USBGPU:
   os.environ['DEV'] = 'AMD'
@@ -32,6 +32,10 @@ from openpilot.selfdrive.modeld.fill_model_msg import fill_model_msg, fill_pose_
 from openpilot.selfdrive.modeld.constants import ModelConstants, Plan
 from openpilot.selfdrive.modeld.models.commonmodel_pyx import DrivingModelFrame, CLContext
 from openpilot.selfdrive.modeld.runners.tinygrad_helpers import qcom_tensor_from_opencl_address
+
+# 添加设备类型日志
+from tinygrad.device import Device
+cloudlog.info(f"当前使用的设备类型: {Device.DEFAULT}")
 
 
 PROCESS_NAME = "selfdrive.modeld.modeld"
@@ -153,6 +157,16 @@ class ModelState:
       self.vision_input_names = list(self.vision_input_shapes.keys())
       self.vision_output_slices = vision_metadata['output_slices']
       vision_output_size = vision_metadata['output_shapes']['outputs'][1]
+
+    # 确定当前使用的后端类型（只打印一次）
+    device_type = "CPU"
+    if TICI and not USBGPU:
+      device_type = "QCOM GPU"
+    elif USBGPU or AMD:
+      device_type = "AMD GPU"
+    elif os.environ.get('DEV') == 'CL':
+      device_type = "CL GPU"
+    cloudlog.info(f"使用{device_type}后端运行模型")
 
     with open(POLICY_METADATA_PATH, 'rb') as f:
       policy_metadata = pickle.load(f)
@@ -314,7 +328,7 @@ def main(demo=False):
       lat_smooth_seconds = params.get_float("LatSmoothSec") * 0.01
       long_delay = params.get_float("LongActuatorDelay")*0.01
       vEgoStopping = params.get_float("VEgoStopping") * 0.01
-      
+
     if custom_lat_delay > 0.0:
       lat_delay = custom_lat_delay + lat_smooth_seconds
     else:

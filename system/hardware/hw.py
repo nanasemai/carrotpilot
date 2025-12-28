@@ -22,8 +22,11 @@ class Paths:
 
   @staticmethod
   def swaglog_root() -> str:
-    if PC:
-      return os.path.join(Paths.comma_home(), "log")
+    if os.environ.get('SWAGLOG_ROOT', False):
+      return os.environ['SWAGLOG_ROOT']
+    elif PC:
+      project_root = Path(__file__).parent.parent.parent.parent
+      return str(project_root / "data" / "log")
     else:
       return "/data/log/"
 

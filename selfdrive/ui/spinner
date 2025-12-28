@@ -1,7 +1,25 @@
 #!/bin/sh
 
-if [ -f /TICI ] && [ ! -f _spinner ]; then
-  cp qt/spinner_larch64 _spinner
+# Check architecture and use appropriate spinner
+ARCH=$(uname -m)
+
+# Copy appropriate pre-built spinner if available and not already present
+if [ ! -f _spinner ]; then
+  if [ -f /TICI ]; then
+    cp qt/spinner_larch64 _spinner
+  elif [ "$ARCH" = "x86_64" ] && [ -f qt/spinner_x86_64 ]; then
+    cp qt/spinner_x86_64 _spinner
+  elif [ "$ARCH" = "aarch64" ] && [ -f qt/spinner_aarch64 ]; then
+    cp qt/spinner_aarch64 _spinner
+  fi
 fi
 
-exec ./_spinner "$1"
+# Make it executable
+if [ -f _spinner ]; then
+  chmod +x _spinner
+  exec ./_spinner "$1"
+else
+  # Fallback if no spinner available
+  echo "Spinner executable not found. Please build it with 'scons selfdrive/ui/_spinner'"
+  exit 1
+fi
