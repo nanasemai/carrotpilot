@@ -1,7 +1,7 @@
 import av
 
 class Camera:
-  def __init__(self, cam_type_state, stream_type, camera_id):
+  def __init__(self, cam_type_state, stream_type, camera_id, width=None, height=None, fps=20, format='mjpeg'):
     try:
       camera_id = int(camera_id)
     except ValueError: # allow strings, ex: /dev/video0
@@ -9,12 +9,34 @@ class Camera:
     self.cam_type_state = cam_type_state
     self.stream_type = stream_type
     self.cur_frame_id = 0
+    self.fps = fps
+    self.format = format
 
-    self.container = av.open(camera_id)
+    # 打开摄像头并尝试设置参数
+    options = {}
+    if width and height:
+      options['video_size'] = f'{width}x{height}'
+    if fps:
+      options['framerate'] = str(fps)
+    if format:
+      options['input_format'] = format
+
+    try:
+      self.container = av.open(camera_id, options=options)
+    except Exception as e:
+      print(f"Warning: Failed to set camera options: {e}")
+      # 回退到默认打开方式
+      self.container = av.open(camera_id)
+
+    # 获取视频流
     assert self.container.streams.video, f"Can't open video stream for camera {camera_id}"
     self.video_stream = self.container.streams.video[0]
+
+    # 获取实际的分辨率
     self.W = self.video_stream.codec_context.width
     self.H = self.video_stream.codec_context.height
+
+    print(f"Camera opened: {self.W}x{self.H}, format: {self.format}, fps: {self.fps}")
 
   @classmethod
   def bgr2nv12(self, bgr):
