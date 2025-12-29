@@ -323,6 +323,10 @@ class Compiled:
 def is_dtype_supported(dtype:DType, device:str|None=None) -> bool:
   if dtype == dtypes.index: return False
   if device is None: device = Device.DEFAULT
+  # GT640M specific restrictions - disable FP16 and 64-bit integer support for OpenCL
+  # GT640M has compute capability 2.1 and does not support FP16 or 64-bit integer operations
+  if device == "CL" and dtype in (dtypes.half, dtypes.int64, dtypes.uint64):
+    return False
   if dtype == dtypes.bfloat16:
     if device == "METAL": return not CI
     if device in {"CUDA", "NV"}: return not CI and not getenv(f"{device}_PTX")
