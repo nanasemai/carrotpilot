@@ -6,6 +6,7 @@ USBGPU = "USBGPU" in os.environ
 if USBGPU:
   os.environ['DEV'] = 'AMD'
   os.environ['AMD_IFACE'] = 'USB'
+AMD = os.environ.get('DEV') == 'AMD'
 from tinygrad.tensor import Tensor
 from tinygrad.dtype import dtypes
 import time
