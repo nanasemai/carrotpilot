@@ -19,7 +19,37 @@ if WIDE_CAM:
   CAMERAS.append(CameraType("wideRoadCameraState", VisionStreamType.VISION_STREAM_WIDE_ROAD, WIDE_CAM))
 
 class Camerad:
-  def __init__(self):
+  def __init__(self, camera_configs=None):
+    # 默认摄像头配置（使用MJPG格式，适配1280x720分辨率）
+    default_configs = {
+      "roadCameraState": {
+        "width": 1920,
+        "height": 1080,
+        "fps": 20,
+        "format": "mjpeg"
+      },
+      "driverCameraState": {
+        "width": 1920,
+        "height": 1080,
+        "fps": 20,
+        "format": "mjpeg"
+      },
+      "wideRoadCameraState": {
+        "width": 1920,
+        "height": 1080,
+        "fps": 20,
+        "format": "mjpeg"
+      }
+    }
+
+    # 合并用户配置和默认配置
+    if camera_configs:
+      for cam_name, config in camera_configs.items():
+        if cam_name in default_configs:
+          default_configs[cam_name].update(config)
+
+    self.camera_configs = default_configs
+
     # Filter cameras to only include those that exist
     self.available_cameras = []
     for c in CAMERAS:
@@ -40,7 +70,19 @@ class Camerad:
     for c in self.available_cameras:
       cam_device = f"/dev/video{c.cam_id}"
       print(f"Opening {c.msg_name} at {cam_device}")
-      cam = Camera(c.msg_name, c.stream_type, cam_device)
+
+      # 获取该摄像头的配置
+      config = self.camera_configs.get(c.msg_name, {})
+
+      cam = Camera(
+        c.msg_name,
+        c.stream_type,
+        cam_device,
+        width=config.get("width"),
+        height=config.get("height"),
+        fps=config.get("fps", 20),
+        format=config.get("format", "mjpeg")
+      )
       self.cameras.append(cam)
       self.vipc_server.create_buffers(c.stream_type, 20, cam.W, cam.H)
 
@@ -60,7 +102,7 @@ class Camerad:
     self.pm.send(pub_type, dat)
 
   def camera_runner(self, cam):
-    rk = Ratekeeper(20, None)
+    rk = Ratekeeper(cam.fps, None)
     for yuv in cam.read_frames():
       self._send_yuv(yuv, cam.cur_frame_id, cam.cam_type_state, cam.stream_type)
       cam.cur_frame_id += 1
