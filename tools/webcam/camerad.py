@@ -23,21 +23,21 @@ class Camerad:
     # 默认摄像头配置（使用MJPG格式，适配1280x720分辨率）
     default_configs = {
       "roadCameraState": {
-        "width": 1280,
-        "height": 720,
-        "fps": 30,
+        "width": 1920,
+        "height": 1080,
+        "fps": 20,
         "format": "mjpeg"
       },
       "driverCameraState": {
-        "width": 1280,
-        "height": 720,
+        "width": 1920,
+        "height": 1080,
         "fps": 20,
         "format": "mjpeg"
       },
       "wideRoadCameraState": {
-        "width": 1280,
-        "height": 720,
-        "fps": 25,
+        "width": 1920,
+        "height": 1080,
+        "fps": 20,
         "format": "mjpeg"
       }
     }
@@ -120,7 +120,6 @@ class Camerad:
 
 
 def main():
-  # 使用默认配置运行（已在__init__中设置）
   camerad = Camerad()
   camerad.run()
 
