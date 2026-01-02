@@ -161,12 +161,12 @@ class ModelState:
 
     # 确定当前使用的后端类型（只打印一次）
     device_type = "CPU"
-    if TICI and not USBGPU:
+    if os.environ.get('DEV') == 'CL':
+      device_type = "CL GPU"
+    elif TICI and not USBGPU:
       device_type = "QCOM GPU"
     elif USBGPU or AMD:
       device_type = "AMD GPU"
-    elif os.environ.get('DEV') == 'CL':
-      device_type = "CL GPU"
     cloudlog.info(f"使用{device_type}后端运行模型")
 
     with open(POLICY_METADATA_PATH, 'rb') as f:

@@ -55,8 +55,10 @@ PRESERVE_COUNT = 5
 
 # path to openpilot screen recordings and error logs
 if PC:
-  SCREENRECORD_PATH = os.path.join(str(Path.home()), ".comma", "media", "0", "videos", "")
-  ERROR_LOGS_PATH = os.path.join(str(Path.home()), ".comma", "community", "crashes", "")
+  # 使用项目根目录下的data文件夹
+  project_root = Path(__file__).parent.parent.parent.parent.parent.parent
+  SCREENRECORD_PATH = os.path.join(project_root, "data", "media", "0", "videos", "")
+  ERROR_LOGS_PATH = os.path.join(project_root, "data", "community", "crashes", "")
 else:
   SCREENRECORD_PATH = "/data/media/0/videos/"
   ERROR_LOGS_PATH = "/data/community/crashes/"
@@ -198,7 +200,7 @@ def ffmpeg_mp4_wrap_process_builder(filename):
   command_line += ["-c", "copy"]
 
   command_line += ["-bsf:a", "aac_adtstoasc"]
-  
+
   command_line += ["-map", "0"]
   if extension == "hevc":
     command_line += ["-vtag", "hvc1"]
