@@ -2286,7 +2286,7 @@ cat > ~/.config/autostart/carrotpilot.desktop << EOF
 [Desktop Entry]
 Type=Application
 Name=Carrotpilot Pc
-Exec=gnome-terminal --title="SunnyPilot Logs" -- bash -c "cd /home/ubuntu/carrotpilot && bash /home/ubuntu/carrotpilot/nana-guide/start_carrotpilot.sh"
+Exec=gnome-terminal --title="Carrotpilot Logs" -- bash -c "cd /home/ubuntu/carrotpilot && bash /home/ubuntu/carrotpilot/nana-guide/start_carrotpilot.sh"
 Hidden=false
 NoDisplay=false
 X-GNOME-Autostart-enabled=true
