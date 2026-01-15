@@ -5,6 +5,11 @@ if "IMAGE" not in os.environ: os.environ["IMAGE"] = "2"
 if "NOLOCALS" not in os.environ: os.environ["NOLOCALS"] = "1"
 if "JIT_BATCH_SIZE" not in os.environ: os.environ["JIT_BATCH_SIZE"] = "0"
 
+# 强制使用OpenCL设备
+os.environ["CL"] = "1"
+os.environ["CUDA"] = "0"
+os.environ["METAL"] = "0"
+
 from tinygrad import fetch, Tensor, TinyJit, Context, GlobalCounters, Device, dtypes
 from tinygrad.helpers import DEBUG, getenv
 from tinygrad.engine.realize import CompiledRunner
