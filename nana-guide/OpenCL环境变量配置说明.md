@@ -11,11 +11,11 @@
 **用途**: 通用的OpenCL环境设置，适用于大多数OpenCL兼容的GPU设备
 
 ### 2. setup_nvidia_gt640m_device_env.sh - NVIDIA GT640M专用设置
-**位置**: `nana-guide/device_env_shell/setup_nvidia_gt640m_device_env.sh`
+**位置**: `nana-guide/setup_nvidia_gt640m_device_env.sh`
 **用途**: 专门针对NVIDIA GeForce GT640M移动显卡的优化配置
 
 ### 3. setup_amd_r7_4700u_device_env.sh - AMD R7 4700U专用设置
-**位置**: `nana-guide/device_env_shell/setup_amd_r7_4700u_device_env.sh`
+**位置**: `nana-guide/setup_amd_r7_4700u_device_env.sh`
 **用途**: 专门针对AMD Ryzen 7 4700U集成显卡的优化配置
 
 ## 环境变量参数详解

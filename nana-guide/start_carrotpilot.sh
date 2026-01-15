@@ -35,5 +35,16 @@ mkdir -p "/tmp/openpilot"
 
 # 启动项目
 echo "[INFO] 执行启动脚本..."
-gnome-terminal --title="Carrotpilot Logs" -- bash -c "cd '$PROJECT_ROOT'; echo '正在启动Carrotpilot...'; ./launch_chffrplus.sh; echo 'Carrotpilot已退出，按任意键关闭窗口...'; read -n1"
-exit $?
+
+# 检查是否有GUI环境
+if command -v gnome-terminal > /dev/null 2>&1; then
+    # 有GUI环境，使用gnome-terminal启动
+    gnome-terminal --title="Carrotpilot Logs" -- bash -c "cd '$PROJECT_ROOT'; echo '正在启动Carrotpilot...'; ./launch_chffrplus.sh; echo 'Carrotpilot已退出，按任意键关闭窗口...'; read -n1"
+    exit $?
+else
+    # 无GUI环境，直接在当前终端启动
+    echo "[WARNING] 未检测到GUI环境，直接在当前终端启动Carrotpilot..."
+    echo "正在启动Carrotpilot..."
+    ./launch_chffrplus.sh
+    exit $?
+fi
