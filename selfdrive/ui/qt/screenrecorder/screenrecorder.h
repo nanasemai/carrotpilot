@@ -8,9 +8,10 @@
 #include <chrono>
 
 #if defined(WSL2) || defined(X86_64)
+// Stub implementation for WSL2 and x86_64 platforms
 class ScreenRecoder : public QPushButton {
 public:
-    ScreenRecoder(QWidget* parent = nullptr) {}
+    ScreenRecoder(QWidget* parent = nullptr) : QPushButton(parent) {}
     virtual ~ScreenRecoder() {}
 
     void update_screen() {}
