@@ -50,17 +50,22 @@ def is_running_on_wsl2():
   try:
     with open('/proc/version', 'r') as f:
       contents = f.read()
-      return 'WSL2' in contents or 'Ubuntu' in contents
+      return 'WSL2' in contents
   except FileNotFoundError:
     return False
 
-if is_running_on_wsl2():
-  qt_env.Append(CXXFLAGS=['-DWSL2'])
+wsl2 = is_running_on_wsl2()
+if wsl2 or arch == 'x86_64':
   base_libs.remove('OmxCore')
   qt_libs.remove('OmxCore')
   qt_src.remove("qt/screenrecorder/screenrecorder.cc")
   qt_src.remove("qt/screenrecorder/omx_encoder.cc")
-  print("Building for WSL2. Removing Screen Recorder")
+  if wsl2:
+    qt_env.Append(CXXFLAGS=['-DWSL2'])
+    print("Building for WSL2. Removing Screen Recorder")
+  else:
+    qt_env.Append(CXXFLAGS=['-DX86_64'])
+    print("Building for x86_64. Removing Screen Recorder (OMX not available)")
 
 # build translation files
 with open(File("translations/languages.json").abspath) as f:
