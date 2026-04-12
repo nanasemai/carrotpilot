@@ -89,25 +89,29 @@ sudo ./tools/install_ubuntu_dependencies.sh
 
 ### 3.3 安装Python依赖
 
-项目使用uv包管理器管理Python依赖并自动创建虚拟环境，所有依赖定义在`pyproject.toml`文件中：
+项目使用uv包管理器管理Python依赖并自动创建虚拟环境，所有依赖定义在`pyproject.toml`文件中。启动脚本会自动处理依赖更新：
 
 ```bash
-./tools/install_python_dependencies.sh
+# 启动时自动更新依赖（推荐方式）
+./launch_openpilot.sh
 ```
 
-该脚本会：
-- 检查并安装uv包管理器（如果未安装）
-- 自动创建并激活`.venv`虚拟环境
-- 使用`uv sync --frozen --all-extras`命令安装`pyproject.toml`中定义的所有Python依赖
-- 确保依赖版本与项目兼容，避免版本冲突
-- 智能管理`.env`文件：
-  - 如果`.env`文件不存在，自动创建并设置默认环境变量
-  - 如果`.env`文件已存在，仅添加缺失的环境变量（不覆盖现有配置）
-  - 不再默认添加`DEV`环境变量，用户需根据自己的GPU类型手动配置
-  - 默认启用ZMQ、USE_WEBCAM等必要配置
-  - 设置正确的`PYTHONPATH`确保模块能被正确导入
+或手动更新：
 
-**注意**：项目已不再使用手动的`pip install`命令安装依赖，所有依赖都应通过`pyproject.toml`和`uv sync`管理，以确保环境一致性。
+```bash
+# 使用uv sync更新依赖
+uv sync --frozen --all-extras
+```
+
+**依赖管理说明**：
+- 启动脚本`launch_chffrplus.sh`会自动检查并安装uv包管理器
+- 使用`uv sync --frozen --all-extras`安装`pyproject.toml`中定义的所有Python依赖
+- 确保依赖版本与项目兼容，避免版本冲突
+- 如果`.env`文件不存在，启动脚本会自动创建并设置默认环境变量
+- 默认启用ZMQ、USE_WEBCAM等必要配置
+- 设置正确的`PYTHONPATH`确保模块能被正确导入
+
+**注意**：项目已不再使用手动的`pip install`命令安装依赖，所有依赖都应通过`pyproject.toml`和`uv sync`管理。
 
 ### 3.4 安装OpenCL驱动
 
@@ -295,48 +299,53 @@ clinfo
 
 ### 3.5 构建项目
 
-在构建项目之前，需要先激活Python虚拟环境，然后使用SCons构建项目。项目编译本身不依赖于`DEV`环境变量，但您可以通过设置`DEV`环境变量来指定运行时使用的GPU设备。
-
-#### 使用CPU构建（默认）
+使用SCons构建项目。项目编译时会自动检测架构并使用默认配置：
 
 ```bash
-# 激活Python虚拟环境
-source .venv/bin/activate
-
-# 自动检测架构并使用CPU构建（-j$(nproc)表示使用所有CPU核心加速构建，-u表示向上构建）
-scons -u -j$(nproc)
+# 构建项目（使用所有CPU核心加速）
+scons -j$(nproc)
 ```
 
-#### 使用GPU构建
+#### 自定义模型编译参数
 
-如果您的系统支持CUDA（NVIDIA GPU）或AMD GPU，可以设置`DEV`环境变量来启用GPU加速编译：
+对于AMD Ryzen 7 4700U等集成显卡，建议设置以下环境变量：
 
 ```bash
-# 激活Python虚拟环境
-source .venv/bin/activate
+# 设置模型编译参数（针对AMD Renoir架构）
+export TG_COMPILE_FLAGS="DEV=CL IMAGE=0 HSA_OVERRIDE_GFX_VERSION=9.0.0"
+export TG_COMPILE_FLAGS_BIG="DEV=CL IMAGE=0 HSA_OVERRIDE_GFX_VERSION=9.0.0"
 
-# 对于NVIDIA GPU（CUDA）
-export DEV=CUDA
-
-# 或者对于AMD GPU
-export DEV=AMD
-
-# 然后构建项目
-scons -u -j$(nproc)
+# 构建项目
+scons -j$(nproc)
 ```
 
-#### 库文件依然依赖 icu66
-```bash
-wget http://archive.ubuntu.com/ubuntu/pool/main/i/icu/libicu66_66.1-2ubuntu2.1_amd64.deb
-sudo dpkg -i libicu66_66.1-2ubuntu2.1_amd64.deb
-```
+**常用编译参数说明：**
 
-项目会自动检测您的架构（X86_64）并构建相应的版本。构建过程可能需要几分钟到几十分钟，具体取决于您的硬件性能。
+| 参数 | 说明 | 示例值 |
+|------|------|--------|
+| DEV | 指定设备类型 | CL, CUDA, AMD, CPU |
+| IMAGE | 图像处理模式 | 0, 1, 2 |
+| HSA_OVERRIDE_GFX_VERSION | AMD GPU架构覆盖 | 9.0.0（适用于Vega架构） |
+| NOLOCALS | 是否使用局部变量优化 | 0, 1 |
+| FLOAT16 | 是否使用半精度浮点数 | 0, 1 |
+| JIT_BATCH_SIZE | JIT批处理大小 | 0, 1, 2 |
 
 **注意：**
-1. 每次构建前都需要确保已激活Python虚拟环境，否则可能会出现依赖缺失或版本不匹配的错误。
-2. 要使用GPU构建，您需要确保已经按照第3.4节的说明正确安装了对应的GPU驱动和OpenCL支持。
-3. `DEV`环境变量会影响模型的编译目标设备，设置为CUDA或AMD可以让模型在GPU上运行，提高推理性能。
+1. 项目会自动检测架构（X86_64）并构建相应版本
+2. 构建过程可能需要几分钟到几十分钟，具体取决于硬件性能
+3. 模型编译参数会影响模型的编译过程，而非项目构建过程
+4. 不同设备可能需要不同的编译参数，建议根据实际情况调整
+
+**通过.env文件配置编译参数：**
+
+推荐在`.env`文件中设置编译参数，这样每次启动时都会自动应用：
+
+```bash
+export DEV=CL
+export IMAGE=0
+export TG_COMPILE_FLAGS="DEV=CL IMAGE=0 HSA_OVERRIDE_GFX_VERSION=9.0.0"
+export TG_COMPILE_FLAGS_BIG="DEV=CL IMAGE=0 HSA_OVERRIDE_GFX_VERSION=9.0.0"
+```
 
 ### 3.6 验证安装
 
@@ -356,40 +365,57 @@ python -c "import cereal.messaging; print('Cereal messaging module loaded succes
 
 ### 4.1 环境配置
 
-在运行carrotpilot之前，.env文件已经由`install_python_dependencies.sh`脚本自动创建和管理。该脚本会：
-- 如果.env文件不存在，自动创建并设置默认环境变量
-- 如果.env文件已存在，仅添加缺失的环境变量（不覆盖现有配置）
-- 不再默认添加`DEV`环境变量，用户需根据自己的GPU类型手动配置
+启动脚本`launch_chffrplus.sh`会自动管理环境配置：
+- 如果`.env`文件不存在，自动创建并设置默认环境变量
+- 如果`.env`文件已存在，自动加载现有配置
 - 默认启用ZMQ、USE_WEBCAM等必要配置
+- 自动创建必要的目录结构
 
-如果需要自定义配置，可以编辑.env文件：
-
-```bash
-# 编辑.env文件
-nano .env
-```
-
-以下是一些常用的环境变量配置选项：
+**推荐的.env配置示例：**
 
 ```bash
-# 在PC上使用ZMQ替代msgq（X86平台必需，已默认设置）
+# 在PC上使用ZMQ替代msgq（X86平台必需）
 export ZMQ=1
 
-# 设置Python路径（已默认设置）
+# 设置Python路径
 export PYTHONPATH=$(pwd)
 
-# 启用USB摄像头支持（已默认设置）
+# 启用USB摄像头支持
 export USE_WEBCAM=1
 
 # 摄像头设备配置
-# 道路摄像头设备ID（必需，默认0对应/dev/video0）
-export ROAD_CAM=0
-# 驾驶员摄像头设备ID（可选，默认2对应/dev/video2）
-# export DRIVER_CAM=2
-# 广角摄像头设备ID（可选，默认4对应/dev/video4）
-# export WIDE_CAM=4
+export ROAD_CAM=0              # 道路摄像头（/dev/video0）
+export DRIVER_CAM=""           # 禁用驾驶员摄像头
+export WIDE_CAM=""             # 禁用广角摄像头
 
-# OpenCL配置（carrotpilot默认启用OpenCL加速）
+# OpenCL配置（使用CL设备进行模型推理）
+export DEV=CL
+export IMAGE=0
+
+# 模型编译参数（针对AMD Renoir架构）
+export TG_COMPILE_FLAGS="DEV=CL IMAGE=0 HSA_OVERRIDE_GFX_VERSION=9.0.0"
+export TG_COMPILE_FLAGS_BIG="DEV=CL IMAGE=0 HSA_OVERRIDE_GFX_VERSION=9.0.0"
+
+# 日志配置
+export LOG_READABLE=1          # 人类可读的日志格式
+
+# 数据存储目录
+export PARAMS_ROOT=$(pwd)/data/params
+export LOG_ROOT=$(pwd)/data/realdata
+export SWAGLOG_ROOT=$(pwd)/data/log
+```
+
+**使用nana-guide中的配置脚本：**
+
+对于AMD Ryzen 7 4700U，可以使用预配置的脚本：
+
+```bash
+# 运行配置脚本
+bash nana-guide/setup_amd_r7_4700u_device_env.sh
+
+# 应用配置
+source .env
+```
 # carrotpilot会自动检测并使用可用的OpenCL设备，优先选择GPU设备
 # 如果GPU不可用，会尝试使用CPU设备进行AI模型推理
 
@@ -424,32 +450,36 @@ source .env
 
 ### 4.2 启动carrotpilot
 
-使用以下命令启动carrotpilot：
+**方法一：使用主启动脚本（推荐）**
 
 ```bash
 # 启动主程序
 ./launch_openpilot.sh
 ```
 
-这会启动manager进程，进而启动其他必要的进程，包括：
-- **modeld**: AI模型推理进程
-- **ui**: 用户界面进程
-- **camerad/webcamerad**: 摄像头处理进程
-- **loggerd**: 日志记录进程
-
-### 4.3 使用USB摄像头
-
-在PC上，可以使用USB摄像头替代专用摄像头：
+**方法二：使用nana-guide中的启动脚本**
 
 ```bash
-# 设置使用USB摄像头
-export USE_WEBCAM=1
-
-# 启动程序
-./launch_openpilot.sh
+# 使用简化的启动脚本
+bash nana-guide/start_carrotpilot.sh
 ```
 
-### 4.4 运行模式
+启动脚本会自动完成以下工作：
+- 检查并安装uv包管理器
+- 更新Python依赖
+- 创建必要的目录结构
+- 设置默认语言配置
+- 启动manager进程，进而启动其他必要进程
+
+**启动的核心进程：**
+- **modeld**: AI模型推理进程
+- **ui**: 用户界面进程
+- **webcamerad**: USB摄像头处理进程
+- **loggerd**: 日志记录进程
+- **pandad**: PANDA设备通信进程
+- **controls**: 控制模块进程
+
+### 4.3 运行模式
 
 carrotpilot支持几种运行模式：
 
@@ -470,7 +500,7 @@ export LITE=1
 ./launch_openpilot.sh
 ```
 
-### 4.5 停止carrotpilot
+### 4.4 停止carrotpilot
 
 要停止carrotpilot，可以使用以下方法：
 
@@ -479,6 +509,29 @@ export LITE=1
 # 方法2：杀死所有相关进程
 sudo pkill -f "python.*openpilot" && sudo pkill -f "modeld" && sudo pkill -f "loggerd"
 ```
+
+### 4.5 启动日志说明
+
+启动时会显示以下关键信息：
+
+```bash
+# 自动检测PC环境
+Detected PC environment, applying PC-specific configuration...
+
+# 更新依赖
+updating dependencies with uv sync...
+
+# 编译模型（首次启动或模型更新时）
+Compiling driving_vision with flags: DEV=CL IMAGE=0 HSA_OVERRIDE_GFX_VERSION=9.0.0
+
+# 启动的进程列表
+encoderd logmessaged webcamerad logcatd proclogd modeld ui locationd ...
+```
+
+**成功启动标志：**
+- 显示"models loaded"表示模型加载成功
+- 显示"connected main cam"表示摄像头连接成功
+- 显示所有核心进程名称表示系统正常运行
 
 ### 4.6 系统目录配置
 
@@ -495,48 +548,43 @@ carrotpilot使用以下优先级来确定目录位置（从高到低）：
 
 | 目录类型 | 环境变量 | 默认路径（PC环境） | 说明 |
 |---------|---------|------------------|------|
-| 日志和视频存储 | LOG_ROOT | `$HOME/.comma/realdata` | 存储行车日志和dashcam视频 |
-| 系统日志 | SWAGLOG_ROOT | `$HOME/.comma/log` | 存储系统运行日志 |
-| 参数目录 | PARAMS_ROOT | `$HOME/.comma/params` | 存储系统参数和配置 |
+| 日志和视频存储 | LOG_ROOT | `$PWD/data/realdata` | 存储行车日志和dashcam视频 |
+| 系统日志 | SWAGLOG_ROOT | `$PWD/data/log` | 存储系统运行日志 |
+| 参数目录 | PARAMS_ROOT | `$PWD/data/params` | 存储系统参数和配置 |
 | 持久化存储 | - | `$HOME/.comma/persist` | 存储持久化数据 |
 | 下载缓存 | COMMA_CACHE | `/tmp/comma_download_cache` | 存储下载的模型和资源 |
 
-#### 4.6.3 项目根目录下的data文件夹
+#### 4.6.3 推荐的目录结构
 
-在PC环境下，推荐将所有数据目录放在项目根目录下的`data`文件夹中。`setup_device_env.sh`脚本会自动配置以下环境变量：
+在PC环境下，推荐将所有数据目录放在项目根目录下的`data`文件夹中：
 
 ```bash
-# 日志和视频存储目录
-export LOG_ROOT="${PWD}/data/realdata"
-# 系统日志目录
-export SWAGLOG_ROOT="${PWD}/data/log"
-# 参数目录
-export PARAMS_ROOT="${PWD}/data/params"
+carrotpilot/
+├── data/
+│   ├── params/          # 参数目录
+│   │   └── d/           # 参数子目录
+│   ├── realdata/        # 日志和视频存储
+│   └── log/             # 系统日志
+└── ...
 ```
 
-#### 4.6.4 手动自定义目录
+#### 4.6.4 通过.env文件配置目录
 
-如果需要手动自定义目录，可以编辑项目根目录下的`.env`文件，添加或修改以下环境变量：
+在`.env`文件中设置目录路径：
 
 ```bash
-# 自定义日志和视频存储目录
-export LOG_ROOT="/path/to/your/logs"
-# 自定义系统日志目录
-export SWAGLOG_ROOT="/path/to/your/system/logs"
-# 自定义参数目录
-export PARAMS_ROOT="/path/to/your/params"
-# 自定义下载缓存目录
-export COMMA_CACHE="/path/to/your/cache"
+# 数据存储目录
+export PARAMS_ROOT="${PWD}/data/params"
+export LOG_ROOT="${PWD}/data/realdata"
+export SWAGLOG_ROOT="${PWD}/data/log"
 ```
 
 #### 4.6.5 目录自动创建
 
-`launch_chffrplus.sh`脚本会自动创建必要的目录结构，包括：
-- 参数目录及其子目录
-- 临时工作目录
+`launch_chffrplus.sh`脚本会自动创建必要的目录结构：
 
 ```bash
-# 自动创建参数目录和子目录
+# 自动创建参数目录和临时目录
 mkdir -p $PARAMS_ROOT/d /tmp/openpilot
 ```
 

@@ -1,39 +1,45 @@
 #!/bin/bash
 
 # Carrotpilot项目启动脚本
-# 用于切换到项目目录，激活虚拟环境并启动项目
+# 用于终端环境启动，监控控制台输出
 
 # 项目根目录
 PROJECT_ROOT="$(realpath "$(dirname "$0")/..")"
 
-echo "[INFO] 启动Carrotpilot项目..."
-echo "[INFO] 项目根目录: $PROJECT_ROOT"
+echo "=========================================="
+echo "  Carrotpilot 启动脚本"
+echo "=========================================="
+echo "项目根目录: $PROJECT_ROOT"
+echo ""
+
+# 清理残留进程
+echo "[INFO] 清理残留进程..."
+pkill -f -9 "(modeld|camerad|ui|controls|manager)" 2>/dev/null || true
+sleep 2
 
 # 切换到项目目录
-cd "$PROJECT_ROOT"
-if [ $? -ne 0 ]; then
+cd "$PROJECT_ROOT" || {
     echo "[ERROR] 无法切换到项目目录: $PROJECT_ROOT"
     exit 1
-fi
-
-# 激活虚拟环境
-if [ -f ".venv/bin/activate" ]; then
-    echo "[INFO] 激活虚拟环境..."
-    source ".venv/bin/activate"
-    if [ $? -ne 0 ]; then
-        echo "[ERROR] 无法激活虚拟环境"
-        exit 1
-    fi
-else
-    echo "[WARNING] 虚拟环境不存在或未找到激活脚本"
-    echo "[INFO] 继续使用当前环境启动..."
-fi
+}
 
 # 确保必要目录存在
+echo "[INFO] 确保必要目录存在..."
 mkdir -p "$PROJECT_ROOT/data/params/d"
 mkdir -p "/tmp/openpilot"
 
+# 设置默认语言（如果未设置）
+if [ ! -f "$PROJECT_ROOT/data/params/d/LanguageSetting" ]; then
+    echo -n "main_en" > "$PROJECT_ROOT/data/params/d/LanguageSetting"
+    echo "[INFO] 设置默认语言为: main_en"
+fi
+
 # 启动项目
-echo "[INFO] 执行启动脚本..."
-gnome-terminal --title="Carrotpilot Logs" -- bash -c "cd '$PROJECT_ROOT'; echo '正在启动Carrotpilot...'; ./launch_chffrplus.sh; echo 'Carrotpilot已退出，按任意键关闭窗口...'; read -n1"
-exit $?
+echo "[INFO] 启动Carrotpilot..."
+echo "=========================================="
+echo ""
+echo "按 Ctrl+C 退出"
+echo ""
+
+# 使用项目的主启动脚本，自动处理依赖和环境配置
+bash ./launch_chffrplus.sh
