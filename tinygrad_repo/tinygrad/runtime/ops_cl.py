@@ -37,7 +37,13 @@ class CLProgram:
                                                         to_char_p_p([lib], ctypes.c_ubyte), binary_status := ctypes.c_int32(),
                                                         errcode_ret := ctypes.c_int32()), errcode_ret)
     check(binary_status.value)
-    check(cl.clBuildProgram(self.program, 1, device.device_id, None, cl.clBuildProgram.argtypes[4](), None)) # NOTE: OSX requires this
+    build_status = cl.clBuildProgram(self.program, 1, device.device_id, None, cl.clBuildProgram.argtypes[4](), None)
+    if build_status != 0:
+      log_size = ctypes.c_size_t()
+      cl.clGetProgramBuildInfo(self.program, device.device_id, cl.CL_PROGRAM_BUILD_LOG, 0, None, log_size)
+      log = ctypes.create_string_buffer(log_size.value) if log_size.value > 0 else ctypes.create_string_buffer(4096)
+      cl.clGetProgramBuildInfo(self.program, device.device_id, cl.CL_PROGRAM_BUILD_LOG, log_size.value, log, None)
+      raise RuntimeError(f"OpenCL Build Error: {log.value.decode() if log_size.value > 0 else 'Unknown error'}")
     self.kernel = checked(cl.clCreateKernel(self.program, name.encode(), status := ctypes.c_int32()), status)
 
   def __del__(self):
