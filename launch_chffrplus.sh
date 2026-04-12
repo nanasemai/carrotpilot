@@ -24,33 +24,37 @@ else
 fi
 
 # PC environment detection and configuration
-if [ ! -f /TICI ]; then
-  echo "Detected PC environment, applying PC-specific configuration..."
+  if [ ! -f /TICI ]; then
+    echo "Detected PC environment, applying PC-specific configuration..."
 
-  # Create necessary directories if they don't exist
-  # Set default PARAMS_ROOT if not already set
-  if [ -z "$PARAMS_ROOT" ]; then
-    PARAMS_ROOT="$PWD/data/params"
+    # Reload udev rules to ensure device permissions are correct (e.g., panda USB access)
+    sudo udevadm control --reload-rules 2>/dev/null || true
+    sudo udevadm trigger 2>/dev/null || true
+
+    # Create necessary directories if they don't exist
+    # Set default PARAMS_ROOT if not already set
+    if [ -z "$PARAMS_ROOT" ]; then
+      PARAMS_ROOT="$PWD/data/params"
+    fi
+    mkdir -p $PARAMS_ROOT/d /tmp/openpilot
+
+    # Set default language if not already set
+    if [ ! -f $PARAMS_ROOT/d/LanguageSetting ]; then
+      echo -n "main_en" > $PARAMS_ROOT/d/LanguageSetting
+    fi
+
+    # Set HardwareC3xLite to 1 by default (forced)
+    echo "1" > $PARAMS_ROOT/d/HardwareC3xLite
+
+    # Set DisableDM to 1 by default (forced)
+    echo "1" > $PARAMS_ROOT/d/DisableDM
+
+    # Set default SWAGLOG_ROOT if not already set
+    if [ -z "$SWAGLOG_ROOT" ]; then
+      SWAGLOG_ROOT="$PWD/data/log"
+    fi
+    mkdir -p $SWAGLOG_ROOT
   fi
-  mkdir -p $PARAMS_ROOT/d /tmp/openpilot
-
-  # Set default language if not already set
-  if [ ! -f $PARAMS_ROOT/d/LanguageSetting ]; then
-    echo -n "main_en" > $PARAMS_ROOT/d/LanguageSetting
-  fi
-
-  # Set HardwareC3xLite to 1 by default (forced)
-  echo "1" > $PARAMS_ROOT/d/HardwareC3xLite
-
-  # Set DisableDM to 1 by default (forced)
-  echo "1" > $PARAMS_ROOT/d/DisableDM
-
-  # Set default SWAGLOG_ROOT if not already set
-  if [ -z "$SWAGLOG_ROOT" ]; then
-    SWAGLOG_ROOT="$PWD/data/log"
-  fi
-  mkdir -p $SWAGLOG_ROOT
-fi
 
 function agnos_init {
   # TODO: move this to agnos
