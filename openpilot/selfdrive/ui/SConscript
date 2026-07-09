@@ -1,3 +1,4 @@
+import os
 from pathlib import Path
 Import('env', 'arch', 'common')
 
@@ -36,14 +37,18 @@ if GetOption('extras') and arch == "larch64":
     ("openpilot_internal", "nightly-dev"),
   ]
 
-  cont = raylib_env.Command("installer/continue_openpilot.o", "installer/continue_openpilot.sh",
-                            "ld -r -b binary -o $TARGET $SOURCE")
-  inter = raylib_env.Command("installer/inter_ttf.o", "installer/inter-ascii.ttf",
-                             "ld -r -b binary -o $TARGET $SOURCE")
-  inter_bold = raylib_env.Command("installer/inter_bold.o", "../assets/fonts/Inter-Bold.ttf",
-                              "ld -r -b binary -o $TARGET $SOURCE")
-  inter_light = raylib_env.Command("installer/inter_light.o", "../assets/fonts/Inter-Light.ttf",
-                              "ld -r -b binary -o $TARGET $SOURCE")
+  # The embedded binary symbol names are derived from the source path passed to `ld`.
+  # installer.cc expects paths relative to the openpilot/ dir (e.g. _binary_selfdrive_assets_fonts_Inter_Bold_ttf_*),
+  # so run `ld` from that dir with relative source paths regardless of where scons is invoked from.
+  op_dir = Dir('#openpilot').abspath
+  def embed(target, rel_source):
+    return raylib_env.Command(target, os.path.join(op_dir, rel_source),
+                              f"cd {op_dir} && ld -r -b binary -o ${{TARGET.abspath}} {rel_source}")
+
+  cont = embed("installer/continue_openpilot.o", "selfdrive/ui/installer/continue_openpilot.sh")
+  inter = embed("installer/inter_ttf.o", "selfdrive/ui/installer/inter-ascii.ttf")
+  inter_bold = embed("installer/inter_bold.o", "selfdrive/assets/fonts/Inter-Bold.ttf")
+  inter_light = embed("installer/inter_light.o", "selfdrive/assets/fonts/Inter-Light.ttf")
   for name, branch in installers:
     d = {'BRANCH': f"'\"{branch}\"'"}
     if "internal" in name:
